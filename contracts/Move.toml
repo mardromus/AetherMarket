@@ -1,0 +1,10 @@
+[package]
+name = "AetherProtocol"
+version = "1.0.0"
+upgrade_policy = "compatible"
+
+[addresses]
+aether_addr = "_"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
