@@ -58,20 +58,20 @@ export interface AgentSpec {
     version: string;
     description: string;
     owner: string;
-    
+
     // Classification
     category: "ai-generation" | "analysis" | "data-retrieval" | "code" | "composite" | "utility";
     tags: string[];
-    
+
     // Capabilities
     capabilities: Record<string, AgentCapabilitySpec>;
-    
+
     // Execution
     model?: string;
-    provider?: "openai" | "anthropic" | "google" | "coingecko" | "serpapi" | "multi-agent";
+    provider?: "openai" | "anthropic" | "google" | "groq" | "coingecko" | "serpapi" | "multi-agent";
     baseUrl?: string;
     executorUrl?: string;
-    
+
     // Requirements
     requiredApiKeys?: string[];
     requiredEnvVars?: string[];
@@ -79,7 +79,7 @@ export interface AgentSpec {
         requestsPerMinute: number;
         requestsPerDay: number;
     };
-    
+
     // Metadata
     successRate: number; // 0-100
     averageExecutionTimeMs: number;
@@ -89,7 +89,11 @@ export interface AgentSpec {
     verifiedAt?: number;
     deprecatedAt?: number;
     maintenanceMode?: boolean;
-    
+
+    // Pricing & Reputation (optional, for UI display)
+    price?: string;
+    reputation?: number;
+
     // Composition
     isComposite?: boolean;
     usesAgents?: string[];
@@ -105,11 +109,11 @@ export interface AgentExecutionRequest {
     agentId: string;
     capabilityId: string;
     parameters: Record<string, any>;
-    
+
     // Payment info
     budgetId?: string;
     maxCostOctas?: string;
-    
+
     // Metadata
     userId?: string;
     sessionId?: string;
@@ -125,13 +129,13 @@ export interface AgentExecutionResponse<T = any> {
         message: string;
         details?: Record<string, any>;
     };
-    
+
     // Execution info
     agentId: string;
     capabilityId: string;
     executionTimeMs: number;
     costOctas: string;
-    
+
     // Metadata
     model?: string;
     tokensUsed?: number;

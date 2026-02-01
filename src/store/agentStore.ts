@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AGENT_SPECS, getAgentCostAPT, getAllAgentIds } from '@/lib/agents/config';
+import { AGENT_SPECS, getAgentCostAPT, getAllAgentIds, UNIFIED_AGENT_REGISTRY } from '@/lib/agents/config';
+import type { AgentSpec } from '@/lib/agents/interface';
 
 export interface Agent {
     id: string;
@@ -11,6 +12,9 @@ export interface Agent {
     imageUrl: string;
     endpoint: string;
     category?: string;
+    model?: string;
+    // Full agent specification from registry
+    fullSpec?: AgentSpec;
     specs?: {
         architecture: string;
         tflops: string;
@@ -39,17 +43,20 @@ interface AgentState {
 function generateDefaultAgents(): Agent[] {
     return getAllAgentIds().map(id => {
         const spec = AGENT_SPECS[id as keyof typeof AGENT_SPECS];
+        const fullSpec = UNIFIED_AGENT_REGISTRY[id as keyof typeof UNIFIED_AGENT_REGISTRY];
         const costAPT = getAgentCostAPT(id);
-        
+
         return {
             id,
             name: spec.name,
-            description: `${spec.name} - ${spec.category}. Powered by ${spec.model}.`,
+            description: fullSpec?.description || `${spec.name} - ${spec.category}. Powered by ${spec.model}.`,
             price: costAPT,
             reputation: Math.floor(Math.random() * 40) + 80, // 80-120
             imageUrl: `https://robohash.org/${id}?set=set1&bgset=bg1`,
             endpoint: spec.endpoint,
             category: spec.category,
+            model: spec.model,
+            fullSpec: fullSpec, // Include complete specification
             isSwarm: spec.isSwarm || false,
             specs: {
                 architecture: spec.model,
@@ -104,6 +111,7 @@ export const useAgentStore = create<AgentState>()(
                 } catch (e) {
                     // no-op
                 }
-            }        }
+            }
+        }
     )
 );

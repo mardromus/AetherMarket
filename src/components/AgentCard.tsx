@@ -3,11 +3,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Zap, ShieldCheck, Cpu, Box } from "lucide-react";
+import { Zap, ShieldCheck, Cpu, Box, Info } from "lucide-react";
 import Link from "next/link";
 import { Agent } from "@/store/agentStore";
 import { useState } from "react";
 import { StakingModal } from "./StakingModal";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export function AgentCard({ agent }: { agent: Agent }) {
     const [isStakingOpen, setIsStakingOpen] = useState(false);

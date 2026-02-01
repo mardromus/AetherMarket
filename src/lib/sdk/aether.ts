@@ -5,10 +5,10 @@
  * with automatic payment handling via x402 protocol
  */
 
-import { 
-    Aptos, 
-    AptosConfig, 
-    Network, 
+import {
+    Aptos,
+    AptosConfig,
+    Network,
     SimpleTransaction,
     Account,
     Ed25519PrivateKey,
@@ -104,18 +104,18 @@ export class AetherSDK {
         try {
             // Search through all agents in config
             const agents: AgentBrowseResult[] = [];
-            
+
             for (const agentId of getAllAgentIds()) {
                 const spec = AGENT_SPECS[agentId as keyof typeof AGENT_SPECS];
                 if (!spec) continue;
-                
+
                 // Match by type, category, name, or capabilities
                 const skillLower = skill.toLowerCase();
                 const typeMatch = spec.type.includes(skillLower);
                 const categoryMatch = spec.category.toLowerCase().includes(skillLower);
                 const nameMatch = spec.name.toLowerCase().includes(skillLower);
-                const capMatch = spec.capabilities.some(c => c.toLowerCase().includes(skillLower));
-                
+                const capMatch = spec.capabilities.some((c: string) => c.toLowerCase().includes(skillLower));
+
                 if (typeMatch || categoryMatch || nameMatch || capMatch) {
                     agents.push({
                         id: agentId,
@@ -127,7 +127,7 @@ export class AetherSDK {
                     });
                 }
             }
-            
+
             // Sort by relevance and return top 5
             return agents.slice(0, 5);
         } catch (error) {
@@ -256,7 +256,7 @@ export class AetherSDK {
         });
 
         return {
-            signature: signedTxn.signature,
+            signature: (signedTxn as any).signature || "",
             publicKey: this.keylessAccount!.publicKey?.toString(),
             txnHash: committedTxn.hash,
             timestamp: Date.now(),

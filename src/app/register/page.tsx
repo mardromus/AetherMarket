@@ -82,7 +82,7 @@ export default function RegisterAgent() {
             description: `Agent ID: ${mockRegistryId}`
         });
 
-        router.push("/");
+        router.push("/dashboard");
     }
 
     return (

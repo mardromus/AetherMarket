@@ -2,6 +2,12 @@
 
 import React, { useState } from 'react';
 import { useKeyless } from '@/lib/keyless/provider';
+import { Navbar } from '@/components/Navbar';
+import { NetworkBackground } from '@/components/NetworkBackground';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Activity, Circle, CheckCircle2, XCircle, Terminal, Shield, Play, Lock } from 'lucide-react';
 
 interface FlowStep {
     id: string;
@@ -123,7 +129,7 @@ export default function M2MDemoPage() {
 
             // Step 5: Autonomous payment
             updateStep('5', 'in-progress', 'Signing transaction autonomously...');
-            
+
             let txnHash: string = '';
             try {
                 const signResponse = await signWithSession({
@@ -133,7 +139,7 @@ export default function M2MDemoPage() {
                         paymentRequired.amount
                     ]
                 });
-                
+
                 txnHash = signResponse.hash;
                 updateStep('5', 'success', `Transaction signed: ${txnHash.slice(0, 10)}...`);
             } catch (error) {
@@ -188,113 +194,152 @@ export default function M2MDemoPage() {
         }
     };
 
-    const getStatusColor = (status: FlowStep['status']) => {
+    const getStatusStyles = (status: FlowStep['status']) => {
         switch (status) {
-            case 'pending': return 'bg-gray-100 text-gray-600';
-            case 'in-progress': return 'bg-blue-100 text-blue-600';
-            case 'success': return 'bg-green-100 text-green-600';
-            case 'error': return 'bg-red-100 text-red-600';
+            case 'pending': return 'border-white/10 bg-white/5 text-muted-foreground';
+            case 'in-progress': return 'border-blue-500/50 bg-blue-500/10 text-blue-400 animate-pulse';
+            case 'success': return 'border-green-500/50 bg-green-500/10 text-green-400';
+            case 'error': return 'border-red-500/50 bg-red-500/10 text-red-400';
         }
     };
 
     const getStatusIcon = (status: FlowStep['status']) => {
         switch (status) {
-            case 'pending': return '⭕';
-            case 'in-progress': return '⏳';
-            case 'success': return '✅';
-            case 'error': return '❌';
+            case 'pending': return <Circle className="w-5 h-5" />;
+            case 'in-progress': return <Activity className="w-5 h-5 animate-spin" />;
+            case 'success': return <CheckCircle2 className="w-5 h-5" />;
+            case 'error': return <XCircle className="w-5 h-5" />;
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen relative text-foreground">
+            <NetworkBackground />
+            <Navbar />
+
+            <div className="pt-32 px-6 max-w-7xl mx-auto pb-20 relative z-10">
                 {/* Header */}
-                <div className="text-center mb-12">
-                    <h1 className="text-5xl font-bold text-white mb-2">M2M Protocol Demo</h1>
-                    <p className="text-xl text-purple-200">Autonomous Agent-to-Service Payments</p>
-                </div>
-
-                {/* Status Cards */}
-                <div className="grid grid-cols-2 gap-4 mb-8 bg-slate-800 bg-opacity-50 p-6 rounded-lg border border-purple-500 border-opacity-30">
-                    <div>
-                        <p className="text-purple-300 text-sm">Authenticated</p>
-                        <p className="text-white text-2xl font-bold">{isAuthenticated ? '✅ Yes' : '❌ No'}</p>
+                <div className="flex items-center gap-4 mb-12">
+                    <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                        <Terminal className="w-8 h-8 text-purple-400" />
                     </div>
                     <div>
-                        <p className="text-purple-300 text-sm">Session Active</p>
-                        <p className="text-white text-2xl font-bold">{session?.isActive ? '✅ Yes' : '❌ No'}</p>
-                    </div>
-                    <div>
-                        <p className="text-purple-300 text-sm">Remaining Payments</p>
-                        <p className="text-white text-2xl font-bold">{session?.remainingRequests || 0}/10</p>
-                    </div>
-                    <div>
-                        <p className="text-purple-300 text-sm">Account Address</p>
-                        <p className="text-white text-sm font-mono">{account?.address.slice(0, 16)}...</p>
+                        <h1 className="text-4xl font-black text-white tracking-tighter">M2M PROTOCOL DEMO</h1>
+                        <p className="text-purple-300 font-mono">AUTONOMOUS AGENT-TO-SERVICE PAYMENTS</p>
                     </div>
                 </div>
 
-                {/* Flow Visualization */}
-                <div className="space-y-4 mb-8">
-                    {flowSteps.map((step, index) => (
-                        <div key={step.id}>
-                            <div className={`p-4 rounded-lg border-2 border-purple-500 border-opacity-30 ${getStatusColor(step.status)}`}>
-                                <div className="flex items-start gap-4">
-                                    <div className="text-3xl mt-1">{getStatusIcon(step.status)}</div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-lg">{step.id}. {step.title}</h3>
-                                        <p className="text-sm opacity-80">{step.description}</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* LEFT COLUMN: Controls & Status */}
+                    <div className="space-y-6">
+                        <Card className="glass-card border-purple-500/30 bg-black/40">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-purple-400">
+                                    <Shield className="w-5 h-5" /> SESSION SECURITY
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                    <span className="text-muted-foreground text-sm">Authentication</span>
+                                    <Badge variant={isAuthenticated ? "default" : "destructive"} className={isAuthenticated ? "bg-green-500/20 text-green-400" : ""}>
+                                        {isAuthenticated ? 'Authenticated' : 'Not Connected'}
+                                    </Badge>
+                                </div>
+                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                    <span className="text-muted-foreground text-sm">Delegation Session</span>
+                                    <Badge variant={session?.isActive ? "default" : "secondary"} className={session?.isActive ? "bg-blue-500/20 text-blue-400" : ""}>
+                                        {session?.isActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </div>
+                                <div className="flex justify-between items-center py-2 border-b border-white/5">
+                                    <span className="text-muted-foreground text-sm">Allowance</span>
+                                    <span className="font-mono text-white">{session?.remainingRequests || 0} / 10 TXs</span>
+                                </div>
+                                <div className="pt-2">
+                                    <span className="text-xs text-muted-foreground block mb-1">Keyless Wallet</span>
+                                    <div className="bg-black/50 p-2 rounded text-xs font-mono text-white/50 truncate">
+                                        {account?.address || "Not connected"}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="glass-card border-white/10 bg-black/40">
+                            <CardHeader>
+                                <CardTitle className="text-white">Run Simulation</CardTitle>
+                                <CardDescription>Execute autonomous M2M payment flow</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <Button
+                                    onClick={runDemoFlow}
+                                    disabled={!isAuthenticated || !session?.isActive}
+                                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold h-12 shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all"
+                                >
+                                    {isAuthenticated && session?.isActive ? (
+                                        <> <Play className="w-4 h-4 mr-2" /> EXECUTE PROTOCOL </>
+                                    ) : (
+                                        <> <Lock className="w-4 h-4 mr-2" /> LOGIN REQUIRED </>
+                                    )}
+                                </Button>
+
+                                <div className="text-xs text-muted-foreground space-y-2 bg-white/5 p-3 rounded">
+                                    <p className="font-bold text-white">Instructions:</p>
+                                    <ol className="list-decimal list-inside space-y-1">
+                                        <li>Login via Navbar</li>
+                                        <li>Enable Delegation (Dashboard)</li>
+                                        <li>Click Execute Protocol</li>
+                                    </ol>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* RIGHT COLUMN: Flow Visualization */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-blue-400" /> REAL-TIME EXECUTION LOG
+                        </h2>
+
+                        <div className="space-y-0 relative">
+                            {/* Vertical Line */}
+                            <div className="absolute left-6 top-4 bottom-4 w-px bg-white/10 z-0" />
+
+                            {flowSteps.map((step, index) => (
+                                <div key={step.id} className="relative z-10 mb-4 group">
+                                    <div className={`
+                                        ml-12 p-4 rounded-xl border transition-all duration-300
+                                        ${getStatusStyles(step.status)}
+                                    `}>
+                                        {/* Status Icon Bubble */}
+                                        <div className={`
+                                            absolute -left-12 top-4 w-10 h-10 rounded-full border-4 border-black flex items-center justify-center
+                                            ${step.status === 'pending' ? 'bg-slate-800 text-muted-foreground' : ''}
+                                            ${step.status === 'in-progress' ? 'bg-blue-600 text-white' : ''}
+                                            ${step.status === 'success' ? 'bg-green-600 text-white' : ''}
+                                            ${step.status === 'error' ? 'bg-red-600 text-white' : ''}
+                                        `}>
+                                            {getStatusIcon(step.status)}
+                                        </div>
+
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-bold text-sm uppercase tracking-wider mb-1">{step.title}</h3>
+                                                <p className="text-sm opacity-90">{step.description}</p>
+                                            </div>
+                                            {step.status === 'in-progress' && <Activity className="w-4 h-4 animate-spin opacity-50" />}
+                                        </div>
+
                                         {step.details && (
-                                            <p className="text-xs font-mono mt-2 opacity-70">{step.details}</p>
+                                            <div className="mt-3 pt-3 border-t border-black/10 dark:border-white/10">
+                                                <code className="text-xs font-mono block break-all opacity-75 bg-black/20 p-2 rounded">
+                                                    {step.details}
+                                                </code>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
-                            {index < flowSteps.length - 1 && (
-                                <div className="flex justify-center my-2">
-                                    <div className="w-1 h-4 bg-purple-500 opacity-50"></div>
-                                </div>
-                            )}
+                            ))}
                         </div>
-                    ))}
-                </div>
-
-                {/* Demo Controls */}
-                <div className="bg-slate-800 bg-opacity-50 border border-purple-500 border-opacity-30 rounded-lg p-6">
-                    <button
-                        onClick={runDemoFlow}
-                        disabled={!isAuthenticated || !session?.isActive}
-                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white font-bold py-3 px-6 rounded-lg transition"
-                    >
-                        {isAuthenticated && session?.isActive ? '🚀 Run Full M2M Flow' : '❌ Login & Create Session First'}
-                    </button>
-
-                    <div className="mt-6 text-purple-200 text-sm space-y-2">
-                        <p className="font-bold">How to use this demo:</p>
-                        <ol className="list-decimal list-inside space-y-1">
-                            <li>Login with Google to create a keyless account</li>
-                            <li>Navigate to Dashboard and create a delegation session</li>
-                            <li>Return here and click &quot;Run Full M2M Flow&quot;</li>
-                            <li>Watch all 8 steps execute autonomously without popups</li>
-                            <li>Check the browser console for detailed logs</li>
-                        </ol>
-                    </div>
-                </div>
-
-                {/* Key Features */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-                    <div className="bg-slate-800 bg-opacity-50 border border-purple-500 border-opacity-30 rounded-lg p-4">
-                        <h3 className="text-purple-300 font-bold mb-2">🔐 Keyless Auth</h3>
-                        <p className="text-gray-300 text-sm">Google-powered keyless accounts with ZK proofs</p>
-                    </div>
-                    <div className="bg-slate-800 bg-opacity-50 border border-purple-500 border-opacity-30 rounded-lg p-4">
-                        <h3 className="text-purple-300 font-bold mb-2">⚡ Autonomous</h3>
-                        <p className="text-gray-300 text-sm">Payments signed without user popups or approval</p>
-                    </div>
-                    <div className="bg-slate-800 bg-opacity-50 border border-purple-500 border-opacity-30 rounded-lg p-4">
-                        <h3 className="text-purple-300 font-bold mb-2">💰 x402 Protocol</h3>
-                        <p className="text-gray-300 text-sm">HTTP 402 payment-required with signature verification</p>
                     </div>
                 </div>
             </div>

@@ -1,22 +1,22 @@
 /**
- * Real Agent Execution Engine - Google Gemini API
+ * Real Agent Execution Engine - Groq API
  * 
- * Handles routing to actual AI services using Google Gemini
+ * Handles routing to actual AI services using Groq (fast Llama models)
  * Supports: Text Generation, Code Analysis, Image Prompts, Web Search, Sentiment Analysis, etc.
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 // Agent type definitions
-export type AgentType = 
-  | "image-generation" 
-  | "code-audit" 
-  | "financial-analysis" 
-  | "web-search"
-  | "text-generation"
-  | "code-generation"
-  | "sentiment-analysis"
-  | "general";
+export type AgentType =
+    | "image-generation"
+    | "code-audit"
+    | "financial-analysis"
+    | "web-search"
+    | "text-generation"
+    | "code-generation"
+    | "sentiment-analysis"
+    | "general";
 
 export interface AgentExecutionResult {
     result: any;
@@ -26,33 +26,42 @@ export interface AgentExecutionResult {
     metadata?: Record<string, any>;
 }
 
-// Initialize Gemini client (lazy loading for performance)
-let genAI: GoogleGenerativeAI | null = null;
+// Initialize Groq client (lazy loading for performance)
+let groqClient: OpenAI | null = null;
 
-function getGeminiClient(): GoogleGenerativeAI {
-    if (!genAI) {
-        const apiKey = process.env.GOOGLE_API_KEY;
+function getGroqClient(): OpenAI {
+    if (!groqClient) {
+        const apiKey = process.env.GROQ_API_KEY;
         if (!apiKey) {
-            throw new Error("GOOGLE_API_KEY environment variable not configured. Get one at https://ai.google.dev");
+            throw new Error("GROQ_API_KEY environment variable not configured. Get one free at https://console.groq.com");
         }
-        genAI = new GoogleGenerativeAI(apiKey);
+        groqClient = new OpenAI({
+            apiKey,
+            baseURL: "https://api.groq.com/openai/v1"
+        });
     }
-    return genAI;
+    return groqClient;
 }
+
+// Default model - Llama 3.3 70B is fast and high quality
+const DEFAULT_MODEL = "llama-3.3-70b-versatile";
 
 /**
  * Execute image generation (Neural Alpha)
- * Uses Gemini to generate detailed image prompts
+ * Uses Groq to generate detailed image prompts
  */
 async function executeImageGeneration(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const prompt = parameters.prompt || "A beautiful landscape";
     const style = parameters.style || "photorealistic";
 
     try {
-        const response = await model.generateContent(`Create a detailed, vivid image prompt based on this description:
+        const response = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Create a detailed, vivid image prompt based on this description:
 "${prompt}"
 
 Style: ${style}
@@ -64,16 +73,20 @@ Requirements:
 - Suitable for image generation APIs
 - Format: [STYLE] [SUBJECT] [SETTING] [LIGHTING] [MOOD] [QUALITY]
 
-Respond with ONLY the detailed prompt, no additional text.`);
+Respond with ONLY the detailed prompt, no additional text.`
+            }],
+            temperature: 0.7,
+            max_tokens: 500
+        });
 
-        const imagePrompt = response.response.text();
+        const imagePrompt = response.choices[0]?.message?.content || "";
 
         return {
             type: "image-prompt",
             originalPrompt: prompt,
             detailedPrompt: imagePrompt,
             style,
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString(),
             note: "Use this prompt with image generation APIs like Midjourney, Stable Diffusion, or DALL-E"
         };
@@ -87,8 +100,7 @@ Respond with ONLY the detailed prompt, no additional text.`);
  * Execute code audit (Quantum Sage)
  */
 async function executeCodeAudit(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const code = parameters.code || "";
     const language = parameters.language || "javascript";
@@ -97,12 +109,16 @@ async function executeCodeAudit(parameters: any): Promise<any> {
         throw new Error("No code provided for audit");
     }
 
-    if (code.length > 100000) {
-        throw new Error("Code is too large (max 100KB). Please provide a smaller snippet.");
+    if (code.length > 50000) {
+        throw new Error("Code is too large (max 50KB). Please provide a smaller snippet.");
     }
 
     try {
-        const response = await model.generateContent(`You are an expert code auditor specializing in ${language}. Analyze this code:
+        const response = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `You are an expert code auditor specializing in ${language}. Analyze this code:
 
 \`\`\`${language}
 ${code}
@@ -125,10 +141,19 @@ Focus on:
 4. Potential runtime errors
 5. Memory leaks and resource management
 
-Respond with ONLY valid JSON, no markdown.`);
+Respond with ONLY valid JSON, no markdown.`
+            }],
+            temperature: 0.3,
+            max_tokens: 2000
+        });
 
-        const content = response.response.text();
-        const auditResult = JSON.parse(content);
+        const content = response.choices[0]?.message?.content || "{}";
+        let auditResult;
+        try {
+            auditResult = JSON.parse(content);
+        } catch {
+            auditResult = { overallScore: 5, riskLevel: "medium", vulnerabilities: [], suggestions: [], strengths: [] };
+        }
 
         return {
             type: "code-audit",
@@ -140,7 +165,7 @@ Respond with ONLY valid JSON, no markdown.`);
             suggestions: auditResult.suggestions || [],
             strengths: auditResult.strengths || [],
             estimatedTimeToFix: auditResult.estimatedTimeToFix || "TBD",
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString()
         };
     } catch (error) {
@@ -153,8 +178,7 @@ Respond with ONLY valid JSON, no markdown.`);
  * Generate code (Syntax Wizard)
  */
 async function executeCodeGeneration(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const prompt = parameters.prompt || parameters.description || "";
     const language = parameters.language || "typescript";
@@ -164,7 +188,11 @@ async function executeCodeGeneration(parameters: any): Promise<any> {
     }
 
     try {
-        const response = await model.generateContent(`Generate clean, well-documented, production-ready ${language} code that solves:
+        const response = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Generate clean, well-documented, production-ready ${language} code that solves:
 "${prompt}"
 
 Requirements:
@@ -175,13 +203,20 @@ Requirements:
 - Example usage at the end
 - Follow best practices
 
-Respond with ONLY the code in a markdown code block, no explanations.`);
+Respond with ONLY the code in a markdown code block, no explanations.`
+            }],
+            temperature: 0.4,
+            max_tokens: 3000
+        });
 
-        let generatedCode = response.response.text();
-        
+        let generatedCode = response.choices[0]?.message?.content || "";
+
         // Remove markdown code block if present
         if (generatedCode.includes("```")) {
-            generatedCode = generatedCode.split("```").slice(1, -1).join("```").trim();
+            const parts = generatedCode.split("```");
+            if (parts.length >= 2) {
+                generatedCode = parts[1].replace(/^[a-z]+\n/, '').trim();
+            }
         }
 
         return {
@@ -189,7 +224,7 @@ Respond with ONLY the code in a markdown code block, no explanations.`);
             language,
             prompt,
             code: generatedCode,
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString()
         };
     } catch (error) {
@@ -202,8 +237,7 @@ Respond with ONLY the code in a markdown code block, no explanations.`);
  * Sentiment analysis (Sentiment Bot)
  */
 async function executeSentimentAnalysis(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const text = parameters.text || parameters.content || "";
 
@@ -212,7 +246,11 @@ async function executeSentimentAnalysis(parameters: any): Promise<any> {
     }
 
     try {
-        const response = await model.generateContent(`Analyze the sentiment of this text:
+        const response = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Analyze the sentiment of this text:
 
 "${text}"
 
@@ -226,15 +264,24 @@ Return a JSON response with:
   "keyPhrases": [string]
 }
 
-Respond with ONLY valid JSON, no markdown or explanations.`);
+Respond with ONLY valid JSON, no markdown or explanations.`
+            }],
+            temperature: 0.2,
+            max_tokens: 500
+        });
 
-        const result = JSON.parse(response.response.text());
+        let result;
+        try {
+            result = JSON.parse(response.choices[0]?.message?.content || "{}");
+        } catch {
+            result = { sentiment: "neutral", confidence: 0.5, score: 0, emotions: [], reasoning: "Unable to parse", keyPhrases: [] };
+        }
 
         return {
             type: "sentiment-analysis",
             ...result,
             textLength: text.length,
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString()
         };
     } catch (error) {
@@ -247,15 +294,14 @@ Respond with ONLY valid JSON, no markdown or explanations.`);
  * Financial analysis (Oracle Prime)
  */
 async function executeFinancialAnalysis(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const symbol = parameters.symbol || parameters.coin || "bitcoin";
 
     try {
         // Fetch real crypto data from free CoinGecko API
         const response = await fetch(
-            `https://api.coingecko.com/api/v3/simple/price?ids=${symbol.toLowerCase()}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_price_change_percentage=true`
+            `https://api.coingecko.com/api/v3/simple/price?ids=${symbol.toLowerCase()}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
         );
 
         if (!response.ok) {
@@ -269,14 +315,18 @@ async function executeFinancialAnalysis(parameters: any): Promise<any> {
             throw new Error(`Coin not found: ${symbol}`);
         }
 
-        // Use Gemini to analyze the data
-        const analysisResponse = await model.generateContent(`Analyze this cryptocurrency market data and provide insights:
+        // Use Groq to analyze the data
+        const analysisResponse = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Analyze this cryptocurrency market data and provide insights:
 
 Coin: ${symbol}
 Price: $${coinData.usd}
 Market Cap: $${coinData.usd_market_cap}
 24h Volume: $${coinData.usd_24h_vol}
-24h Change: ${coinData.usd_24h_change_percentage}%
+24h Change: ${coinData.usd_24h_change}%
 
 Provide JSON analysis:
 {
@@ -289,9 +339,18 @@ Provide JSON analysis:
   "recommendations": string
 }
 
-Respond with ONLY valid JSON, no markdown.`);
+Respond with ONLY valid JSON, no markdown.`
+            }],
+            temperature: 0.3,
+            max_tokens: 1000
+        });
 
-        const analysis = JSON.parse(analysisResponse.response.text());
+        let analysis;
+        try {
+            analysis = JSON.parse(analysisResponse.choices[0]?.message?.content || "{}");
+        } catch {
+            analysis = { marketSentiment: "neutral", trendAnalysis: "Unable to analyze", riskFactors: [], recommendations: "Do your own research" };
+        }
 
         return {
             type: "financial-analysis",
@@ -300,10 +359,10 @@ Respond with ONLY valid JSON, no markdown.`);
                 price: coinData.usd,
                 marketCap: coinData.usd_market_cap,
                 volume24h: coinData.usd_24h_vol,
-                change24h: coinData.usd_24h_change_percentage
+                change24h: coinData.usd_24h_change
             },
             analysis,
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString(),
             dataSource: "CoinGecko API"
         };
@@ -317,8 +376,7 @@ Respond with ONLY valid JSON, no markdown.`);
  * Web search (Search Sage)
  */
 async function executeWebSearch(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const query = parameters.query || parameters.search || "";
 
@@ -327,44 +385,32 @@ async function executeWebSearch(parameters: any): Promise<any> {
     }
 
     try {
-        // Try to use Google Custom Search if available
-        const customSearchKey = process.env.GOOGLE_CUSTOM_SEARCH_KEY;
-        const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
+        // Use Groq to provide search-like response
+        const searchResponse = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Search query: "${query}"
 
-        let searchResults = "";
+Provide a comprehensive summary as if you searched the web. Include:
+1. Top findings and answers
+2. Key points and facts
+3. Relevant statistics if applicable
+4. Source recommendations (suggest where to find more info)
 
-        if (customSearchKey && searchEngineId) {
-            // Use Custom Search API
-            const response = await fetch(
-                `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(query)}&key=${customSearchKey}&cx=${searchEngineId}`
-            );
-            const data = await response.json();
-            searchResults = JSON.stringify(data.items?.slice(0, 5) || [], null, 2);
-        } else {
-            // Use Gemini to search (requires internet-enabled model)
-            searchResults = `[Note: Custom Search API not configured. Using Gemini's knowledge cutoff.]`;
-        }
-
-        // Use Gemini to summarize search results
-        const analysisResponse = await model.generateContent(`Search query: "${query}"
-
-${searchResults ? `Search results:\n${searchResults}\n` : ""}
-
-Provide a comprehensive summary of search results for this query. Include:
-1. Top findings
-2. Key points
-3. Relevant statistics
-4. Source recommendations
-
-Format as structured text with clear sections.`);
+Format as structured text with clear sections.`
+            }],
+            temperature: 0.5,
+            max_tokens: 1500
+        });
 
         return {
             type: "search-results",
             query,
-            summary: analysisResponse.response.text(),
-            model: "gemini-1.5-pro",
+            summary: searchResponse.choices[0]?.message?.content || "No results",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString(),
-            note: "Set GOOGLE_CUSTOM_SEARCH_KEY and GOOGLE_SEARCH_ENGINE_ID in .env for live web search"
+            note: "Results based on AI knowledge. For real-time data, add web search API."
         };
     } catch (error) {
         console.error("Web search error:", error);
@@ -376,24 +422,30 @@ Format as structured text with clear sections.`);
  * General text generation (Atlas AI)
  */
 async function executeTextGeneration(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const message = parameters.prompt || parameters.query || parameters.message || "";
-    const maxTokens = parameters.maxTokens || 1000;
 
     if (!message) {
         throw new Error("Prompt is required");
     }
 
     try {
-        const response = await model.generateContent(message);
+        const response = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: message
+            }],
+            temperature: 0.7,
+            max_tokens: 2000
+        });
 
         return {
             type: "text-generation",
-            response: response.response.text(),
+            response: response.choices[0]?.message?.content || "",
             prompt: message,
-            model: "gemini-1.5-pro",
+            model: DEFAULT_MODEL,
             timestamp: new Date().toISOString()
         };
     } catch (error) {
@@ -406,8 +458,7 @@ async function executeTextGeneration(parameters: any): Promise<any> {
  * Research (Research Assistant - Composite Agent)
  */
 async function executeResearch(parameters: any): Promise<any> {
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const client = getGroqClient();
 
     const topic = parameters.topic || parameters.prompt || "";
 
@@ -417,7 +468,11 @@ async function executeResearch(parameters: any): Promise<any> {
 
     try {
         // Step 1: Generate research plan
-        const planResponse = await model.generateContent(`Create a research plan for: "${topic}"
+        const planResponse = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Create a research plan for: "${topic}"
 
 Provide a JSON outline:
 {
@@ -427,12 +482,25 @@ Provide a JSON outline:
   "expectedSources": [string]
 }
 
-Respond with ONLY valid JSON.`);
+Respond with ONLY valid JSON.`
+            }],
+            temperature: 0.4,
+            max_tokens: 500
+        });
 
-        const plan = JSON.parse(planResponse.response.text());
+        let plan;
+        try {
+            plan = JSON.parse(planResponse.choices[0]?.message?.content || "{}");
+        } catch {
+            plan = { mainTopics: [topic], questions: [], searchTerms: [], expectedSources: [] };
+        }
 
         // Step 2: Generate comprehensive research
-        const researchResponse = await model.generateContent(`Provide comprehensive research on: "${topic}"
+        const researchResponse = await client.chat.completions.create({
+            model: DEFAULT_MODEL,
+            messages: [{
+                role: "user",
+                content: `Provide comprehensive research on: "${topic}"
 
 Research plan:
 ${JSON.stringify(plan, null, 2)}
@@ -445,14 +513,18 @@ Include:
 5. Future outlook
 6. Key sources and references
 
-Provide detailed, well-structured analysis.`);
+Provide detailed, well-structured analysis.`
+            }],
+            temperature: 0.5,
+            max_tokens: 3000
+        });
 
         return {
             type: "research",
             topic,
             plan,
-            research: researchResponse.response.text(),
-            model: "gemini-1.5-pro",
+            research: researchResponse.choices[0]?.message?.content || "",
+            model: DEFAULT_MODEL,
             agentType: "composite",
             timestamp: new Date().toISOString()
         };
@@ -474,7 +546,7 @@ export async function executeAgent(
     let result: any = null;
 
     try {
-        console.log(`\n🤖 ====== AGENT EXECUTION START ======`);
+        console.log(`\n🤖 ====== AGENT EXECUTION START (GROQ) ======`);
         console.log(`🤖 Agent ID: ${agentId}`);
         console.log(`🤖 Task Type: ${taskType}`);
         console.log(`🤖 Parameters: `, JSON.stringify(parameters, null, 2));
@@ -527,8 +599,8 @@ export async function executeAgent(
             metadata: {
                 timestamp: new Date().toISOString(),
                 success: true,
-                costEstimate: estimateCost(taskType, parameters),
-                model: "gemini-1.5-pro"
+                costEstimate: "Free (Groq)",
+                model: DEFAULT_MODEL
             }
         };
     } catch (error) {
@@ -538,14 +610,14 @@ export async function executeAgent(
         console.error(`🤖 Task Type: ${taskType}`);
         console.error(`🤖 Error: ${errorMessage}`);
         console.error(`🤖 Stack:`, error instanceof Error ? error.stack : "No stack trace");
-        
+
         return {
             result: {
                 type: "error",
                 error: errorMessage,
                 taskType,
                 agentId,
-                details: "Agent execution failed. Ensure GOOGLE_API_KEY is configured and parameters are valid."
+                details: "Agent execution failed. Ensure GROQ_API_KEY is configured in .env.local"
             },
             executionTime: Date.now() - startTime,
             agentId,
@@ -560,24 +632,6 @@ export async function executeAgent(
 }
 
 /**
- * Estimate cost of agent execution (free tier)
- */
-function estimateCost(taskType: AgentType, parameters: Record<string, any>): string {
-    const costMap: Record<AgentType, string> = {
-        "image-generation": "Free (Gemini)",
-        "code-audit": "Free (Gemini)",
-        "code-generation": "Free (Gemini)",
-        "financial-analysis": "Free (Gemini + CoinGecko)",
-        "web-search": "Free (Gemini + Custom Search)",
-        "sentiment-analysis": "Free (Gemini)",
-        "text-generation": "Free (Gemini)",
-        "general": "Free (Gemini)"
-    };
-
-    return costMap[taskType] || "Free (Gemini)";
-}
-
-/**
  * Get agent type from agent ID
  */
 export function getAgentType(agentId: string): AgentType {
@@ -585,18 +639,18 @@ export function getAgentType(agentId: string): AgentType {
         // Visual Generation
         "neural-alpha": "image-generation",
         "pixel-sage": "image-generation",
-        
+
         // Code Analysis & Generation
         "quantum-sage": "code-audit",
         "code-guardian": "code-audit",
         "syntax-wizard": "code-generation",
         "dev-copilot": "code-generation",
         "secure-coder": "code-audit",
-        
+
         // Financial & Market Data
         "oracle-prime": "financial-analysis",
         "market-analyst": "financial-analysis",
-        
+
         // General Purpose
         "atlas-ai": "text-generation",
         "echo-mind": "text-generation",
@@ -618,43 +672,43 @@ export async function executeOrchestratedAgent(
     parameters: Record<string, any>
 ): Promise<AgentExecutionResult> {
     const startTime = Date.now();
-    
+
     try {
         console.log(`🤖 Orchestration: ${orchestratorId} → ${targetId}`);
-        
+
         const orchestratorType = getAgentType(orchestratorId);
         console.log(`Step 1: Orchestrator (${orchestratorId}) analysis...`);
-        
+
         const orchestratorResult = await executeAgent(
             orchestratorId,
             orchestratorType,
             parameters
         );
-        
+
         if (!orchestratorResult.metadata?.success) {
             throw new Error(`Orchestrator failed: ${orchestratorResult.metadata?.error}`);
         }
-        
+
         console.log(`Step 2: Target agent (${targetId}) executing...`);
-        
+
         const targetType = getAgentType(targetId);
         const enhancedParameters = {
             ...parameters,
             _orchestratorContext: orchestratorResult.result
         };
-        
+
         const targetResult = await executeAgent(
             targetId,
             targetType,
             enhancedParameters
         );
-        
+
         if (!targetResult.metadata?.success) {
             throw new Error(`Target agent failed: ${targetResult.metadata?.error}`);
         }
-        
+
         const executionTime = Date.now() - startTime;
-        
+
         return {
             result: {
                 type: "orchestrated-result",
@@ -673,7 +727,7 @@ export async function executeOrchestratedAgent(
                 timestamp: new Date().toISOString(),
                 success: true,
                 workflowType: "orchestrated",
-                totalCost: "Free (Gemini)"
+                totalCost: "Free (Groq)"
             }
         };
     } catch (error) {

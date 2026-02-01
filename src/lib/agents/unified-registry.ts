@@ -11,6 +11,72 @@ import type { AgentSpec } from "./interface";
 // ============================================
 
 export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
+    // ========== TEXT & ANALYSIS AGENTS ==========
+    "atlas-ai": {
+        id: "atlas-ai",
+        name: "Atlas AI",
+        version: "1.0.0",
+        description: "General-purpose text generation, analysis, and reasoning using Groq",
+        owner: "aether-labs",
+        category: "ai-generation",
+        tags: ["text", "writing", "general", "groq"],
+        model: "llama-3.3-70b-versatile",
+        provider: "groq",
+        requiredApiKeys: ["GROQ_API_KEY"],
+        price: "0.02",
+        reputation: 940,
+
+        capabilities: {
+            "text-generation": {
+                id: "text-generation",
+                name: "Text Generation",
+                description: "Generate high-quality text content for any purpose",
+                inputParameters: [
+                    {
+                        name: "prompt",
+                        type: "string",
+                        description: "Your question or instruction for the AI",
+                        required: true,
+                        minLength: 5,
+                        maxLength: 10000,
+                        example: "Explain quantum computing in simple terms"
+                    }
+                ],
+                outputSchema: {
+                    type: "object",
+                    properties: {
+                        text: { type: "string", description: "Generated text response" },
+                        model: { type: "string" },
+                        tokensUsed: { type: "number" }
+                    },
+                    required: ["text"]
+                },
+                costOctas: "2000000", // 0.02 APT
+                executionTimeMs: { min: 1000, max: 15000, average: 3000 },
+                maxInputSize: 10000,
+                timeoutMs: 30000,
+                examples: [
+                    {
+                        input: { prompt: "What is blockchain technology?" },
+                        output: { text: "Blockchain is a distributed ledger technology...", model: "llama-3.3-70b-versatile", tokensUsed: 150 },
+                        description: "Simple question answering"
+                    }
+                ],
+                errorCases: [
+                    { error: "PROMPT_TOO_SHORT", cause: "Prompt is less than 5 characters", solution: "Provide a more detailed prompt" }
+                ]
+            }
+        },
+
+        successRate: 98.5,
+        averageExecutionTimeMs: 3200,
+        totalExecutions: 1250,
+        averageRating: 4.7,
+        isVerified: true,
+        verifiedAt: Date.now() - 90 * 24 * 60 * 60 * 1000,
+        canInvokeOtherAgents: true
+    },
+
     // ========== GENERATION AGENTS ==========
     "neural-alpha": {
         id: "neural-alpha",
@@ -23,7 +89,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         model: "dall-e-3",
         provider: "openai",
         requiredApiKeys: ["OPENAI_API_KEY"],
-        
+        price: "0.05",
+        reputation: 980,
+
         capabilities: {
             "image-generation": {
                 id: "image-generation",
@@ -109,7 +177,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 ]
             }
         },
-        
+
         successRate: 99.2,
         averageExecutionTimeMs: 12000,
         totalExecutions: 890,
@@ -131,7 +199,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         model: "gpt-4o",
         provider: "openai",
         requiredApiKeys: ["OPENAI_API_KEY"],
-        
+        price: "0.03",
+        reputation: 950,
+
         capabilities: {
             "code-audit": {
                 id: "code-audit",
@@ -278,7 +348,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 errorCases: []
             }
         },
-        
+
         successRate: 97.8,
         averageExecutionTimeMs: 18000,
         totalExecutions: 567,
@@ -299,7 +369,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         model: "gpt-4o",
         provider: "openai",
         requiredApiKeys: ["OPENAI_API_KEY"],
-        
+        price: "0.03",
+        reputation: 920,
+
         capabilities: {
             "code-generation": {
                 id: "code-generation",
@@ -380,7 +452,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 ]
             }
         },
-        
+
         successRate: 96.3,
         averageExecutionTimeMs: 10000,
         totalExecutions: 2100,
@@ -391,126 +463,6 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         dependsOnAgents: ["quantum-sage"]
     },
 
-    // ========== ANALYSIS AGENTS ==========
-    "atlas-ai": {
-        id: "atlas-ai",
-        name: "Atlas AI",
-        version: "1.0.0",
-        description: "General-purpose text generation, analysis, and reasoning",
-        owner: "aether-labs",
-        category: "analysis",
-        tags: ["text", "analysis", "writing", "gpt-4o"],
-        model: "gpt-4o",
-        provider: "openai",
-        requiredApiKeys: ["OPENAI_API_KEY"],
-        
-        capabilities: {
-            "text-generation": {
-                id: "text-generation",
-                name: "Text Generation",
-                description: "Generate high-quality text content",
-                inputParameters: [
-                    {
-                        name: "prompt",
-                        type: "string",
-                        description: "What to generate",
-                        required: true,
-                        minLength: 10,
-                        maxLength: 2000,
-                        example: "Write a professional bio for a software engineer"
-                    },
-                    {
-                        name: "maxTokens",
-                        type: "number",
-                        description: "Maximum tokens in response",
-                        required: false,
-                        minValue: 50,
-                        maxValue: 4000,
-                        example: 500
-                    },
-                    {
-                        name: "temperature",
-                        type: "number",
-                        description: "Creativity level (0-1)",
-                        required: false,
-                        minValue: 0,
-                        maxValue: 1,
-                        example: 0.7
-                    },
-                    {
-                        name: "format",
-                        type: "string",
-                        description: "Output format",
-                        required: false,
-                        enum: ["markdown", "plain", "html", "json"],
-                        example: "markdown"
-                    }
-                ],
-                outputSchema: {
-                    type: "object",
-                    properties: {
-                        text: { type: "string" },
-                        tokensUsed: { type: "number" },
-                        format: { type: "string" }
-                    },
-                    required: ["text"]
-                },
-                costOctas: "2000000", // 0.02 APT
-                executionTimeMs: { min: 2000, max: 30000, average: 8000 },
-                maxInputSize: 100000,
-                timeoutMs: 30000,
-                examples: [],
-                errorCases: []
-            },
-            "analysis": {
-                id: "analysis",
-                name: "Analysis",
-                description: "Analyze and summarize content",
-                inputParameters: [
-                    {
-                        name: "content",
-                        type: "string",
-                        description: "Content to analyze",
-                        required: true,
-                        minLength: 50,
-                        maxLength: 100000,
-                        example: "Article text here..."
-                    },
-                    {
-                        name: "analysisType",
-                        type: "string",
-                        description: "Type of analysis",
-                        required: true,
-                        enum: ["summary", "sentiment", "key-points", "full-analysis"],
-                        example: "key-points"
-                    }
-                ],
-                outputSchema: {
-                    type: "object",
-                    properties: {
-                        analysis: { type: "string" },
-                        keyPoints: { type: "array", items: { type: "string" } },
-                        summary: { type: "string" }
-                    },
-                    required: ["analysis"]
-                },
-                costOctas: "1500000", // 0.015 APT
-                executionTimeMs: { min: 2000, max: 25000, average: 6000 },
-                maxInputSize: 200000,
-                timeoutMs: 25000,
-                examples: [],
-                errorCases: []
-            }
-        },
-        
-        successRate: 98.5,
-        averageExecutionTimeMs: 7000,
-        totalExecutions: 1250,
-        averageRating: 4.7,
-        isVerified: true,
-        verifiedAt: Date.now() - 90 * 24 * 60 * 60 * 1000,
-        canInvokeOtherAgents: true
-    },
 
     // ========== DATA AGENTS ==========
     "oracle-prime": {
@@ -523,7 +475,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         tags: ["finance", "crypto", "data", "coingecko"],
         model: "coingecko-api",
         provider: "coingecko",
-        
+        price: "0.02",
+        reputation: 960,
+
         capabilities: {
             "financial-analysis": {
                 id: "financial-analysis",
@@ -599,7 +553,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 ]
             }
         },
-        
+
         successRate: 99.7,
         averageExecutionTimeMs: 1200,
         totalExecutions: 5420,
@@ -621,7 +575,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         model: "serp-api",
         provider: "serpapi",
         requiredApiKeys: ["SERP_API_KEY"],
-        
+        price: "0.01",
+        reputation: 890,
+
         capabilities: {
             "web-search": {
                 id: "web-search",
@@ -697,7 +653,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 ]
             }
         },
-        
+
         successRate: 98.1,
         averageExecutionTimeMs: 3500,
         totalExecutions: 3200,
@@ -719,7 +675,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         model: "gpt-4o",
         provider: "openai",
         requiredApiKeys: ["OPENAI_API_KEY"],
-        
+        price: "0.01",
+        reputation: 850,
+
         capabilities: {
             "sentiment-analysis": {
                 id: "sentiment-analysis",
@@ -777,7 +735,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 errorCases: []
             }
         },
-        
+
         successRate: 95.4,
         averageExecutionTimeMs: 2800,
         totalExecutions: 1850,
@@ -797,7 +755,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         category: "composite",
         tags: ["research", "composite", "search", "analysis"],
         provider: "multi-agent",
-        
+        price: "0.04",
+        reputation: 975,
+
         capabilities: {
             "research": {
                 id: "research",
@@ -840,7 +800,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 errorCases: []
             }
         },
-        
+
         successRate: 96.9,
         averageExecutionTimeMs: 18000,
         totalExecutions: 320,
@@ -861,7 +821,9 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
         category: "composite",
         tags: ["code", "security", "composite", "generation"],
         provider: "multi-agent",
-        
+        price: "0.06",
+        reputation: 990,
+
         capabilities: {
             "secure-generation": {
                 id: "secure-generation",
@@ -912,7 +874,7 @@ export const UNIFIED_AGENT_REGISTRY: Record<string, AgentSpec> = {
                 errorCases: []
             }
         },
-        
+
         successRate: 98.3,
         averageExecutionTimeMs: 32000,
         totalExecutions: 180,

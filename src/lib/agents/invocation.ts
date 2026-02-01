@@ -65,7 +65,7 @@ export async function invokeAgent(
 
         // 4. Get cost and check against budget
         const costInOctas = capability.costInOctas;
-        
+
         if (request.maxPrice) {
             const maxPrice = BigInt(request.maxPrice);
             const cost = BigInt(costInOctas);
@@ -122,7 +122,7 @@ export async function invokeAgent(
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         // Record failed transaction
         recordTransaction(
             request.sessionId,
@@ -173,12 +173,12 @@ async function executeTargetAgent(
 async function handleOraclePrime(capability: string, parameters: any): Promise<any> {
     if (capability === "financial-analysis") {
         const symbol = parameters.symbol?.toLowerCase() || "bitcoin";
-        
+
         // Fetch from CoinGecko API (free tier)
         const response = await fetch(
             `https://api.coingecko.com/api/v3/simple/price?ids=${symbol}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true`
         );
-        
+
         if (!response.ok) {
             throw new Error(`CoinGecko API error: ${response.statusText}`);
         }
@@ -251,12 +251,13 @@ async function handleSearchSage(capability: string, parameters: any): Promise<an
 }
 
 async function handleAtlasAI(capability: string, parameters: any): Promise<any> {
-    const OpenAI = require("openai").default;
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const { getAIClient, getModelName } = await import('@/lib/ai/provider');
+    const client = getAIClient();
+    const model = getModelName();
 
     if (capability === "text-generation") {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4-turbo",
+        const response = await client.chat.completions.create({
+            model,
             messages: [
                 {
                     role: "user",
@@ -268,8 +269,8 @@ async function handleAtlasAI(capability: string, parameters: any): Promise<any> 
 
         return {
             text: response.choices[0].message.content,
-            tokens: response.usage.total_tokens,
-            model: "gpt-4-turbo"
+            tokens: response.usage?.total_tokens,
+            model
         };
     }
 
@@ -277,12 +278,13 @@ async function handleAtlasAI(capability: string, parameters: any): Promise<any> 
 }
 
 async function handleSentimentBot(capability: string, parameters: any): Promise<any> {
-    const OpenAI = require("openai").default;
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const { getAIClient, getModelName } = await import('@/lib/ai/provider');
+    const client = getAIClient();
+    const model = getModelName();
 
     if (capability === "sentiment-analysis") {
-        const response = await openai.chat.completions.create({
-            model: "gpt-4-turbo",
+        const response = await client.chat.completions.create({
+            model,
             messages: [
                 {
                     role: "system",
@@ -297,7 +299,7 @@ async function handleSentimentBot(capability: string, parameters: any): Promise<
         });
 
         const content = response.choices[0].message.content;
-        const parsed = JSON.parse(content);
+        const parsed = JSON.parse(content || '{}');
 
         return {
             sentiment: parsed.sentiment,

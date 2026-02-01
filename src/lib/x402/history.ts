@@ -86,7 +86,7 @@ export function getTransactionStats() {
 
     const totalSpent = history
         .filter(tx => tx.status === "success")
-        .reduce((sum, tx) => sum + tx.costAPT, 0);
+        .reduce((sum, tx) => sum + (Number(tx.costAPT) || 0), 0);
 
     const avgExecutionTime = history.length > 0
         ? history.reduce((sum, tx) => sum + tx.executionTime, 0) / history.length

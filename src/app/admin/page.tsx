@@ -27,7 +27,8 @@ import {
 import { AetherSDK } from '@/lib/sdk/aether';
 import { toast } from 'sonner';
 import { useAgentStore } from '@/store/agentStore';
-import { AGENT_METADATA } from '@/lib/agents/schemas';
+import { AgentSchemaViewer } from '@/components/AgentSchemaViewer';
+import { AgentIntegrationGuide } from '@/components/AgentIntegrationGuide';
 
 interface BudgetSession {
     id: string;
@@ -63,7 +64,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'discovery' | 'agents' | 'budgets' | 'schemas'>('discovery');
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [selectedAgentForSchema, setSelectedAgentForSchema] = useState<string>('neural-alpha');
-    
+
     // Discovery
     const [discoverSkill, setDiscoverSkill] = useState('');
     const [discoveredAgents, setDiscoveredAgents] = useState<DiscoveredAgent[]>([]);
@@ -99,7 +100,7 @@ export default function AdminDashboard() {
             setIsSearching(true);
             const result = await aether.browse(discoverSkill);
             setDiscoveredAgents(result as DiscoveredAgent[]);
-            
+
             if (result.length === 0) {
                 toast.info('No agents found matching that skill');
             } else {
@@ -150,7 +151,7 @@ export default function AdminDashboard() {
 
             setBudgets([...budgets, newBudget]);
             toast.success(`✅ Budget created for ${agent.name}: ${amount} APT`);
-            
+
             setSelectedAgentId('');
             setBudgetAmount('');
             setBudgetDays('7');
@@ -228,44 +229,40 @@ export default function AdminDashboard() {
                 <div className="flex gap-2 border-b border-white/10 mb-6">
                     <button
                         onClick={() => setActiveTab('discovery')}
-                        className={`px-4 py-2 font-semibold transition-colors ${
-                            activeTab === 'discovery'
+                        className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'discovery'
                                 ? 'text-primary border-b-2 border-primary'
                                 : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <Search className="w-4 h-4 inline mr-2" />
                         Discover
                     </button>
                     <button
                         onClick={() => setActiveTab('agents')}
-                        className={`px-4 py-2 font-semibold transition-colors ${
-                            activeTab === 'agents'
+                        className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'agents'
                                 ? 'text-primary border-b-2 border-primary'
                                 : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <Code2 className="w-4 h-4 inline mr-2" />
                         All Agents ({storeAgents.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('budgets')}
-                        className={`px-4 py-2 font-semibold transition-colors ${
-                            activeTab === 'budgets'
+                        className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'budgets'
                                 ? 'text-primary border-b-2 border-primary'
                                 : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <Wallet className="w-4 h-4 inline mr-2" />
                         Budgets ({budgets.length})
                     </button>
                     <button
                         onClick={() => setActiveTab('schemas')}
-                        className={`px-4 py-2 font-semibold transition-colors ${
-                            activeTab === 'schemas'
+                        className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'schemas'
                                 ? 'text-primary border-b-2 border-primary'
                                 : 'text-muted-foreground hover:text-foreground'
-                        }`}
+                            }`}
                     >
                         <BookOpen className="w-4 h-4 inline mr-2" />
                         Schemas & API
@@ -494,11 +491,10 @@ export default function AdminDashboard() {
                                     const percentSpent = (budget.spentAPT / budget.budgetAPT) * 100;
 
                                     return (
-                                        <Card key={budget.id} className={`backdrop-blur-md ${
-                                            displayStatus === 'expired'
+                                        <Card key={budget.id} className={`backdrop-blur-md ${displayStatus === 'expired'
                                                 ? 'bg-red-500/5 border-red-500/20'
                                                 : 'bg-black/40 border-white/10'
-                                        }`}>
+                                            }`}>
                                             <CardContent className="pt-6">
                                                 <div className="space-y-4">
                                                     <div className="flex justify-between items-start">
@@ -519,11 +515,10 @@ export default function AdminDashboard() {
                                                         </div>
                                                         <div className="w-full bg-black/50 rounded-full h-2 overflow-hidden border border-white/10">
                                                             <div
-                                                                className={`h-full transition-all ${
-                                                                    percentSpent > 80 ? 'bg-red-500' :
-                                                                    percentSpent > 50 ? 'bg-yellow-500' :
-                                                                    'bg-green-500'
-                                                                }`}
+                                                                className={`h-full transition-all ${percentSpent > 80 ? 'bg-red-500' :
+                                                                        percentSpent > 50 ? 'bg-yellow-500' :
+                                                                            'bg-green-500'
+                                                                    }`}
                                                                 style={{ width: `${Math.min(percentSpent, 100)}%` }}
                                                             />
                                                         </div>
@@ -600,9 +595,9 @@ export default function AdminDashboard() {
                                     onChange={(e) => setSelectedAgentForSchema(e.target.value)}
                                     className="w-full bg-black/50 border border-white/10 rounded px-4 py-3 text-white font-semibold"
                                 >
-                                    {Object.entries(AGENT_METADATA).map(([id, metadata]) => (
-                                        <option key={id} value={id}>
-                                            {metadata.name} - {metadata.cost} APT
+                                    {storeAgents.map((agent) => (
+                                        <option key={agent.id} value={agent.id}>
+                                            {agent.name} - {agent.price.toFixed(3)} APT
                                         </option>
                                     ))}
                                 </select>
@@ -610,134 +605,24 @@ export default function AdminDashboard() {
                         </Card>
 
                         {(() => {
-                            const metadata = AGENT_METADATA[selectedAgentForSchema as keyof typeof AGENT_METADATA];
-                            if (!metadata) return null;
+                            const agent = storeAgents.find(a => a.id === selectedAgentForSchema);
+                            if (!agent?.fullSpec) return null;
 
                             return (
-                                <div className="space-y-4">
-                                    {/* Agent Info */}
-                                    <Card className="bg-gradient-to-r from-primary/20 to-primary/5 border-primary/30">
-                                        <CardContent className="pt-6">
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Agent</p>
-                                                    <p className="font-bold">{metadata.name}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Cost</p>
-                                                    <p className="font-bold text-green-400">{metadata.cost}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Model</p>
-                                                    <p className="font-bold font-mono text-sm">{metadata.model}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground mb-1">Category</p>
-                                                    <p className="font-bold">{metadata.category}</p>
-                                                </div>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground mt-4">{metadata.description}</p>
-                                        </CardContent>
-                                    </Card>
+                                <>
+                                    {/* Schema Viewer Component */}
+                                    <AgentSchemaViewer agent={agent.fullSpec} />
 
-                                    {/* Example Request */}
-                                    <Card className="bg-blue-500/5 border-blue-500/20">
+                                    {/* Integration Guide Component */}
+                                    <Card className="bg-purple-500/5 border-purple-500/20 mt-6">
                                         <CardHeader>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Code2 className="w-5 h-5" />
-                                                Example Request
-                                            </CardTitle>
+                                            <CardTitle className="text-lg">💻 Integration Examples</CardTitle>
                                         </CardHeader>
                                         <CardContent>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    const code = JSON.stringify(metadata.examples?.[0], null, 2);
-                                                    copyToClipboard(code, `request-${selectedAgentForSchema}`);
-                                                }}
-                                                className="mb-3 gap-2"
-                                            >
-                                                {copiedCode === `request-${selectedAgentForSchema}` ? (
-                                                    <>
-                                                        <Check className="w-3 h-3" />
-                                                        Copied
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="w-3 h-3" />
-                                                        Copy
-                                                    </>
-                                                )}
-                                            </Button>
-                                            <pre className="bg-black/80 p-4 rounded border border-white/10 overflow-x-auto text-xs">
-                                                <code className="text-cyan-400 font-mono">
-                                                    {JSON.stringify(metadata.examples?.[0], null, 2)}
-                                                </code>
-                                            </pre>
+                                            <AgentIntegrationGuide agent={agent.fullSpec} />
                                         </CardContent>
                                     </Card>
-
-                                    {/* Example Response */}
-                                    <Card className="bg-green-500/5 border-green-500/20">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Info className="w-5 h-5" />
-                                                Example Response
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    const code = JSON.stringify(metadata.examples?.[1], null, 2);
-                                                    copyToClipboard(code, `response-${selectedAgentForSchema}`);
-                                                }}
-                                                className="mb-3 gap-2"
-                                            >
-                                                {copiedCode === `response-${selectedAgentForSchema}` ? (
-                                                    <>
-                                                        <Check className="w-3 h-3" />
-                                                        Copied
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="w-3 h-3" />
-                                                        Copy
-                                                    </>
-                                                )}
-                                            </Button>
-                                            <pre className="bg-black/80 p-4 rounded border border-white/10 overflow-x-auto text-xs max-h-96">
-                                                <code className="text-green-400 font-mono">
-                                                    {JSON.stringify(metadata.examples?.[1], null, 2)}
-                                                </code>
-                                            </pre>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* API Documentation Info */}
-                                    <Card className="bg-yellow-500/5 border-yellow-500/20">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <BookOpen className="w-5 h-5" />
-                                                How to Use This Agent
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            <p className="text-sm">1. Prepare your request with the required parameters above</p>
-                                            <p className="text-sm">2. Call the agent via <code className="bg-black/50 px-2 py-1 rounded text-cyan-400">executeAgentTask()</code></p>
-                                            <p className="text-sm">3. Handle the response - check <code className="bg-black/50 px-2 py-1 rounded text-cyan-400">success</code> field first</p>
-                                            <p className="text-sm">4. Access result data from <code className="bg-black/50 px-2 py-1 rounded text-cyan-400">response.result</code></p>
-                                            <p className="text-sm">5. Monitor cost in <code className="bg-black/50 px-2 py-1 rounded text-cyan-400">response.cost</code> (octas)</p>
-                                            <Link href="/integration">
-                                                <Button variant="outline" className="mt-4 w-full">
-                                                    View Full Integration Guide
-                                                </Button>
-                                            </Link>
-                                        </CardContent>
-                                    </Card>
-                                </div>
+                                </>
                             );
                         })()}
                     </div>
