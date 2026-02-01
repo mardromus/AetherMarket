@@ -21,9 +21,8 @@ export default function PublishPage() {
     const router = useRouter();
     const [isMinting, setIsMinting] = useState(false);
 
-    const { register, handleSubmit, formState: { errors }, setValue } = useForm<AgentFormData>({
-        // @ts-ignore - zod resolver type inference issue
-        resolver: zodResolver(agentSchema),
+    const { register, handleSubmit, formState: { errors }, setValue } = useForm({
+        resolver: zodResolver(agentSchema) as any,
         defaultValues: {
             name: "",
             description: "",

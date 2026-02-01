@@ -1,6 +1,6 @@
 import { KeylessWalletSelector } from "./KeylessWalletSelector";
 import Link from "next/link";
-import { Cpu, LayoutDashboard, FileText, Plus } from "lucide-react"; // Added icons
+import { Cpu, LayoutDashboard, Settings, Bot, BookOpen, Code2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Navbar() {
@@ -14,24 +14,28 @@ export function Navbar() {
                     AETHER <span className="text-primary group-hover:text-pink-500 transition-colors">MARKET</span>
                 </Link>
 
-                {/* New Links */}
+                {/* Essential Navigation Links */}
                 <div className="hidden md:flex gap-6 items-center border-l border-white/10 pl-6 h-8">
-                    <Link href="/dashboard" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
+                    <Link href="/agents" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-cyan-400 transition-colors flex items-center gap-2">
+                        <Bot className="w-3 h-3" /> AGENTS
+                    </Link>
+                    <Link href="/admin" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-purple-400 transition-colors flex items-center gap-2">
+                        <Settings className="w-3 h-3" /> ADMIN
+                    </Link>
+                    <Link href="/dashboard" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-green-400 transition-colors flex items-center gap-2">
                         <LayoutDashboard className="w-3 h-3" /> DASHBOARD
                     </Link>
-                    <Link href="/protocol" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-primary transition-colors flex items-center gap-2">
-                        <FileText className="w-3 h-3" /> PROTOCOL
+                    <Link href="/docs" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-blue-400 transition-colors flex items-center gap-2">
+                        <BookOpen className="w-3 h-3" /> DOCS
+                    </Link>
+                    <Link href="/integration" className="text-xs font-bold tracking-wider text-muted-foreground hover:text-teal-400 transition-colors flex items-center gap-2">
+                        <Code2 className="w-3 h-3" /> INTEGRATION
                     </Link>
                 </div>
             </div>
             <div className="flex gap-4 items-center">
-                <Link href="/register">
-                    <Button variant="ghost" className="text-cyan-400 hover:text-white hover:bg-cyan-400/10 font-bold tracking-wide border border-cyan-400/20">
-                        <Plus className="w-4 h-4 mr-2" /> MINT AGENT
-                    </Button>
-                </Link>
                 <KeylessWalletSelector />
             </div>
         </nav>
     );
-}
+} 

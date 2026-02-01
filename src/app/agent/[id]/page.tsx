@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useAgentStore } from '@/store/agentStore';
+import { AGENT_REGISTRY } from '@/lib/agents/registry';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,15 +22,26 @@ interface LogEntry {
     type: 'info' | 'success' | 'error' | 'warning' | 'payment';
 }
 
+type ExecutionMode = 'direct' | 'orchestrated'; // direct = user calls agent, orchestrated = agent calls agent
+
 export default function AgentDetailsPage() {
     const params = useParams();
     const { agents } = useAgentStore();
     const { isAuthenticated } = useKeyless(); // Use Keyless auth check
-    const [agent, setAgent] = useState(agents.find(a => a.id === params.id));
+    
+    // Try to get agent from real registry first, then fall back to store
+    const [agent, setAgent] = useState(() => {
+        const agentId = params.id as string;
+        const registryAgent = AGENT_REGISTRY[agentId];
+        if (registryAgent) return registryAgent as any;
+        return agents.find(a => a.id === params.id);
+    });
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [outputData, setOutputData] = useState<{ type: string, content: any } | null>(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [taskParams, setTaskParams] = useState<any>({});
+    const [executionMode, setExecutionMode] = useState<ExecutionMode>('direct'); // NEW: Track execution mode
+    const [orchestratorAgent, setOrchestratorAgent] = useState<string>(''); // NEW: Selected orchestrator agent
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Refresh agent if store loads later or changes
@@ -64,27 +76,65 @@ export default function AgentDetailsPage() {
             return;
         }
 
+        // Validate orchestrated mode selection
+        if (executionMode === 'orchestrated' && !orchestratorAgent) {
+            toast.error("Please select an orchestrator agent");
+            addLog("Execution Aborted: No orchestrator agent selected.", "error");
+            return;
+        }
+
         // Reset State
         setLogs([]);
         setOutputData(null);
 
-        // Determine task type based on agent category
-        let taskType = 'financial-analysis';
-        let params: any = { symbol: 'APT' };
+        // Determine task type and parameters based on agent ID
+        let taskType = 'text-generation'; // default
+        let params: any = { prompt: 'What is blockchain?' };
 
-        if (agent.category?.toLowerCase().includes('forge') || agent.name.includes("VORTEX")) {
-            taskType = 'image-generation';
-            params = { prompt: 'A futuristic AI agent in a cyberpunk city' };
-        } else if (agent.category?.toLowerCase().includes('logic') || agent.name.includes("DEEP")) {
-            taskType = 'code-audit';
-            params = { code: 'function transfer(address to, uint amount) { balances[to] += amount; }' };
+        // Get the first capability from the agent
+        if (agent) {
+            const capabilities = Object.keys(agent.capabilities || {});
+            if (capabilities.length > 0) {
+                taskType = capabilities[0]; // Use the first capability
+            }
+            
+            // Set appropriate default parameters based on agent ID/type
+            if (agent.id === 'atlas-ai' || taskType === 'text-generation') {
+                params = { prompt: 'Explain quantum computing in simple terms' };
+            } else if (agent.id === 'neural-alpha' || taskType === 'image-generation') {
+                params = { prompt: 'A futuristic AI agent in a cyberpunk city', style: 'photorealistic' };
+            } else if (agent.id === 'quantum-sage' || taskType === 'code-audit') {
+                params = { code: 'function transfer(address to, uint amount) { balances[to] += amount; }', language: 'solidity' };
+            } else if (agent.id === 'syntax-wizard' || taskType === 'code-generation') {
+                params = { prompt: 'Create a simple React button component', language: 'typescript' };
+            } else if (agent.id === 'oracle-prime' || taskType === 'financial-analysis') {
+                params = { symbol: 'bitcoin', timeframe: '24h' };
+            } else if (agent.id === 'search-sage' || taskType === 'web-search') {
+                params = { query: 'latest AI developments 2026', limit: 5 };
+            } else if (agent.id === 'sentiment-bot' || taskType === 'sentiment-analysis') {
+                params = { text: 'This product is amazing! Highly recommend it.' };
+            }
         }
 
         setTaskParams(params);
+        
+        if (executionMode === 'orchestrated') {
+            const orchestrator = agents.find(a => a.id === orchestratorAgent);
+            addLog(`🤖 ORCHESTRATION MODE ACTIVE`, "info");
+            addLog(`Orchestrator Agent: ${orchestrator?.name}`, "info");
+            addLog(`Target Agent: ${agent?.name}`, "info");
+            addLog(`Workflow: ${orchestrator?.name} will execute ${agent?.name}`, "warning");
+            addLog(`Total Cost: ${(Number(orchestrator?.price) + Number(agent?.price)).toFixed(3)} APT`, "info");
+        } else {
+            addLog(`👤 DIRECT EXECUTION MODE`, "info");
+            addLog(`Cost: ${agent?.price} APT`, "info");
+        }
+        
         addLog(`Initializing x402 payment protocol...`, "info");
         addLog(`Task: ${taskType}`, "info");
+        addLog(`Agent: ${agent?.name} (${agent?.id})`, "info");
 
-        // Open payment modal
+        // Open payment modal with orchestration context
         setIsPaymentModalOpen(true);
     };
 
@@ -184,10 +234,71 @@ export default function AgentDetailsPage() {
                                 <span className="text-primary font-bold">{agent.onChainData?.reputationScore || agent.reputation}/1000</span>
                             </div>
 
+                            <Separator className="bg-white/10" />
+
+                            {/* NEW: Execution Mode Selector */}
+                            <div className="space-y-3">
+                                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Execution Mode</div>
+                                
+                                {/* Direct Execution */}
+                                <button
+                                    onClick={() => setExecutionMode('direct')}
+                                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                                        executionMode === 'direct'
+                                            ? 'border-primary bg-primary/10'
+                                            : 'border-white/10 hover:border-white/20 bg-white/5'
+                                    }`}
+                                >
+                                    <div className="font-semibold text-sm">👤 Use Agent Directly</div>
+                                    <div className="text-xs text-muted-foreground mt-1">You call {agent.name} directly</div>
+                                </button>
+
+                                {/* Orchestrated Execution */}
+                                <button
+                                    onClick={() => setExecutionMode('orchestrated')}
+                                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                                        executionMode === 'orchestrated'
+                                            ? 'border-purple-500 bg-purple-500/10'
+                                            : 'border-white/10 hover:border-white/20 bg-white/5'
+                                    }`}
+                                >
+                                    <div className="font-semibold text-sm">🤖 Use Your Agent</div>
+                                    <div className="text-xs text-muted-foreground mt-1">Your agent uses {agent.name} internally</div>
+                                </button>
+
+                                {/* Agent Selector for Orchestrated Mode */}
+                                {executionMode === 'orchestrated' && (
+                                    <div className="space-y-2 bg-purple-500/5 p-3 rounded-lg border border-purple-500/20">
+                                        <label className="text-xs font-semibold text-muted-foreground">Select your orchestrator agent:</label>
+                                        <select
+                                            value={orchestratorAgent}
+                                            onChange={(e) => setOrchestratorAgent(e.target.value)}
+                                            className="w-full bg-black/50 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                        >
+                                            <option value="">Choose an agent...</option>
+                                            {agents
+                                                .filter(a => a.id !== params.id) // Don't allow self-reference
+                                                .map(a => (
+                                                    <option key={a.id} value={a.id}>
+                                                        {a.name} ({a.price} APT)
+                                                    </option>
+                                                ))
+                                            }
+                                        </select>
+                                        {orchestratorAgent && (
+                                            <div className="text-xs text-purple-400 mt-2">
+                                                💡 Workflow: {agents.find(a => a.id === orchestratorAgent)?.name} → {agent.name}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* x402 Payment Button */}
                             <Button
                                 className="w-full bg-primary hover:bg-cyan-400 text-black font-bold shadow-[0_0_15px_rgba(14,165,233,0.2)] hover:shadow-[0_0_25px_rgba(14,165,233,0.5)] transition-all h-12"
                                 onClick={handleExecuteAgent}
+                                disabled={executionMode === 'orchestrated' && !orchestratorAgent}
                             >
                                 <Zap className="w-4 h-4 mr-2 fill-current" />
                                 EXECUTE WITH x402

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { AGENT_SPECS, getAgentCostAPT, getAllAgentIds } from '@/lib/agents/config';
 
 export interface Agent {
     id: string;
@@ -10,21 +11,19 @@ export interface Agent {
     imageUrl: string;
     endpoint: string;
     category?: string;
-    // New 2027 Specs
     specs?: {
-        architecture: string; // e.g., "Omni-7B-Quantized"
-        tflops: string;      // e.g., "450 TFLOPS"
-        vram: string;        // e.g., "8x H100 Cluster"
-        latency: string;     // e.g., "12ms"
+        architecture: string;
+        tflops: string;
+        vram: string;
+        latency: string;
     };
     isSwarm?: boolean;
-    // Aether Protocol V1 Fields
     onChainData?: {
         registryId: string;
         ownerAddress: string;
-        reputationScore: number; // 0-1000
-        totalVolume: number;     // APT
-        disputeRate: number;    // % 0-100
+        reputationScore: number;
+        totalVolume: number;
+        disputeRate: number;
     };
 }
 
@@ -34,87 +33,42 @@ interface AgentState {
     updateReputation: (id: string, score: number) => void;
 }
 
-const DEFAULT_AGENTS: Agent[] = [
-    {
-        id: "nexus-prime",
-        name: "NEXUS PRIME",
-        description: "The central coordination node. Orchestrates multi-agent workflows with 99.9% accuracy.",
-        price: 0.03,
-        reputation: 99,
-        imageUrl: "https://robohash.org/nexus?set=set1&bgset=bg1",
-        endpoint: "/api/mock-agent",
-        category: "Orchestrator",
-        isSwarm: true,
-        specs: {
-            architecture: "GPT-6 (Refactored)",
-            tflops: "8.2 PFLOPS",
-            vram: "Global Pool",
-            latency: "4ms"
-        },
-        onChainData: {
-            registryId: "0x1::1",
-            ownerAddress: "0xcafe...babe",
-            reputationScore: 998,
-            totalVolume: 45000,
-            disputeRate: 0.01
-        }
-    },
-    {
-        id: "quantum-sage",
-        name: "DEEP THINK v9",
-        description: "Specialized in recursive reasoning and cryptographic proofs. Solves NP-Hard problems in seconds.",
-        price: 0.5,
-        reputation: 97,
-        imageUrl: "https://robohash.org/deepthink?set=set1&bgset=bg1",
-        endpoint: "/api/mock-agent",
-        category: "Logic Engine",
-        specs: {
-            architecture: "Llama-Omega-128B",
-            tflops: "1.2 PFLOPS",
-            vram: "4x H200",
-            latency: "200ms"
-        },
-        onChainData: {
-            registryId: "0x1::2",
-            ownerAddress: "0xdead...beef",
-            reputationScore: 850,
-            totalVolume: 1200,
-            disputeRate: 2.5
-        }
-    },
-    {
-        id: "neural-alpha",  // Changed from "3" to match executor
-        name: "VORTEX RENDERER",
-        description: "Hyper-realistic asset generation pipeline. Capable of real-time 8K video synthesis.",
-        price: 0.05,
-        reputation: 92,
-        imageUrl: "https://robohash.org/vortex?set=set1&bgset=bg1",
-        endpoint: "/api/mock-agent",
-        category: "Reality Forge",
-        specs: {
-            architecture: "Stable-Diffusion-X",
-            tflops: "550 TFLOPS",
-            vram: "Distributed GPU",
-            latency: "1.5s"
-        }
-    },
-    {
-        id: "oracle-prime",
-        name: "DATA SUIT 7",
-        description: "Autonomous web scraper and vectorizer. Converting the internet into structured knowledge.",
-        price: 0.05,
-        reputation: 88,
-        imageUrl: "https://robohash.org/data?set=set1&bgset=bg1",
-        endpoint: "/api/mock-agent",
-        category: "Data Harvester",
-        specs: {
-            architecture: "Mistral-Small-Flash",
-            tflops: "120 TFLOPS",
-            vram: "Edge Compute",
-            latency: "12ms"
-        }
-    }
-];
+/**
+ * Generate default agents from unified config
+ */
+function generateDefaultAgents(): Agent[] {
+    return getAllAgentIds().map(id => {
+        const spec = AGENT_SPECS[id as keyof typeof AGENT_SPECS];
+        const costAPT = getAgentCostAPT(id);
+        
+        return {
+            id,
+            name: spec.name,
+            description: `${spec.name} - ${spec.category}. Powered by ${spec.model}.`,
+            price: costAPT,
+            reputation: Math.floor(Math.random() * 40) + 80, // 80-120
+            imageUrl: `https://robohash.org/${id}?set=set1&bgset=bg1`,
+            endpoint: spec.endpoint,
+            category: spec.category,
+            isSwarm: spec.isSwarm || false,
+            specs: {
+                architecture: spec.model,
+                tflops: `${Math.floor(Math.random() * 500) + 50} TFLOPS`,
+                vram: "Cloud GPU",
+                latency: `${Math.floor(Math.random() * 2000) + 100}ms`
+            },
+            onChainData: {
+                registryId: `0x${id.charCodeAt(0)}::${id.charCodeAt(1)}`,
+                ownerAddress: `0xaether${id.slice(0, 6)}`,
+                reputationScore: Math.floor(Math.random() * 300) + 700,
+                totalVolume: Math.floor(Math.random() * 50000),
+                disputeRate: Math.random() * 5
+            }
+        };
+    });
+}
+
+const DEFAULT_AGENTS = generateDefaultAgents();
 
 export const useAgentStore = create<AgentState>()(
     persist(
@@ -126,7 +80,30 @@ export const useAgentStore = create<AgentState>()(
             })),
         }),
         {
-            name: 'aether-agent-storage',
-        }
+            name: 'aether-agent-storage',            // Reconcile persisted agents with any new default agents added in code
+            onRehydrateStorage: () => (state) => {
+                try {
+                    const defaultIds = DEFAULT_AGENTS.map(a => a.id);
+                    const persisted = (state as any)?.agents || [];
+                    const persistedIds = persisted.map((a: any) => a.id);
+
+                    // Add missing defaults
+                    const missing = DEFAULT_AGENTS.filter(a => !persistedIds.includes(a.id));
+
+                    // Update existing entries from defaults for schema drift
+                    const merged = persisted.map((p: any) => {
+                        const updated = DEFAULT_AGENTS.find(d => d.id === p.id);
+                        return updated ? { ...updated, reputation: p.reputation ?? updated.reputation, onChainData: p.onChainData ?? updated.onChainData } : p;
+                    });
+
+                    if (missing.length > 0) {
+                        (state as any).agents = [...merged, ...missing];
+                    } else {
+                        (state as any).agents = merged;
+                    }
+                } catch (e) {
+                    // no-op
+                }
+            }        }
     )
 );

@@ -81,6 +81,31 @@ export function AgentCard({ agent }: { agent: Agent }) {
                         <Cpu className="w-3 h-3 mr-2" /> INITIALIZE
                     </Button>
                 </Link>
+
+                {/* Info Dialog */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" className="w-[48px] border-white/10 text-white text-[10px] h-9">
+                            <Info className="w-3 h-3" />
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>How to use {agent.name}</DialogTitle>
+                            <DialogDescription className="mt-2">Quick copyable example and integration guide for this agent.</DialogDescription>
+                        </DialogHeader>
+
+                        <pre className="mt-4 bg-[#07111a] p-3 rounded text-xs overflow-auto"><code>{`const result = await client.executeAgentTask({\n  agentId: "${agent.id}",\n  taskType: "${agent.specs ? agent.specs.architecture : 'task'}",\n  parameters: { /* ... */ }\n});`}</code></pre>
+
+                        <div className="mt-4 flex gap-2">
+                            <Link href="/integration">
+                                <Button className="text-xs">Open Integration Guide</Button>
+                            </Link>
+                            <Button className="text-xs" onClick={() => { navigator.clipboard.writeText(`const result = await client.executeAgentTask({ agentId: "${agent.id}", taskType: "${agent.specs ? agent.specs.architecture : 'task'}", parameters: { /* ... */ } });`); toast.success('Copied to clipboard'); }}>Copy</Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 {/* Mock Staking Button */}
                 <Button
                     variant="outline"

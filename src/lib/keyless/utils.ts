@@ -41,11 +41,10 @@ export function buildGoogleAuthUrl(config: KeylessConfig = DEFAULT_KEYLESS_CONFI
 /**
  * Decode and validate Google JWT
  */
-export function decodeGoogleJWT(idToken: string): GoogleJWTPayload {
+export function decodeGoogleJWT(idToken: string, validateExpiration = true): GoogleJWTPayload {
     try {
         const decoded = jwtDecode<GoogleJWTPayload>(idToken);
 
-        // Basic validation
         if (!decoded.sub || !decoded.iss || !decoded.exp) {
             throw new Error('Invalid JWT: missing required fields');
         }
@@ -54,10 +53,11 @@ export function decodeGoogleJWT(idToken: string): GoogleJWTPayload {
             throw new Error('Invalid JWT: invalid issuer');
         }
 
-        // Check expiration
-        const now = Math.floor(Date.now() / 1000);
-        if (decoded.exp < now) {
-            throw new Error('JWT expired');
+        if (validateExpiration) {
+            const now = Math.floor(Date.now() / 1000);
+            if (decoded.exp < now) {
+                throw new Error('JWT expired');
+            }
         }
 
         return decoded;

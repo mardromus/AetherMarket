@@ -33,10 +33,11 @@ export function WalletSelector() {
     };
 
     if (connected && account && typeof account.address === "string") {
+        const address = account.address as string;
         return (
             <Button variant="outline" onClick={() => disconnect()} className="gap-2 glass-card text-primary hover:bg-primary/20 border-primary/50">
                 <Wallet className="w-4 h-4" />
-                {account.address.slice(0, 6)}...{account.address.slice(-4)}
+                {address.slice(0, 6)}...{address.slice(-4)}
             </Button>
         );
     }

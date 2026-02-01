@@ -12,24 +12,26 @@ import { getFacilitator } from "@/lib/x402/facilitator";
 import { Network } from "@aptos-labs/ts-sdk";
 import type { PaymentRequired, PaymentSignature, AgentTaskRequest } from "@/types/x402";
 import { executeAgent, getAgentType } from "@/lib/agents/executor";
+import { getAgentCostOctas } from "@/lib/agents/config";
 
 // In-memory store for payment requests (in production, use Redis or database)
 const pendingRequests = new Map<string, PaymentRequired>();
 
 export async function POST(request: NextRequest) {
     try {
+        console.log("\n🚀 [API] Agent Execute Request Received");
         const body: AgentTaskRequest & { requestId?: string } = await request.json();
+        console.log("📦 [API] Body:", JSON.stringify(body, null, 2));
+        
         const paymentSignatureHeader = request.headers.get("PAYMENT-SIGNATURE");
+        console.log("💳 [API] Payment Signature Header Present:", !!paymentSignatureHeader);
+        console.log("🆔 [API] Agent ID:", body.agentId);
+        console.log("📋 [API] Task Type:", body.taskType);
+        console.log("⚙️ [API] Parameters:", JSON.stringify(body.parameters, null, 2));
 
-        // Get agent pricing - reduced for testnet ease
-        const agentPricing: Record<string, string> = {
-            "neural-alpha": "5000000", // 0.05 APT (DALL-E is expensive but lowered for testing)
-            "quantum-sage": "3000000", // 0.03 APT (GPT-4 audit)
-            "oracle-prime": "2000000", // 0.02 APT (financial data)
-            "default": "3000000"
-        };
-
-        const priceInOctas = agentPricing[body.agentId] || agentPricing.default;
+        // Get agent pricing from unified config
+        const priceInOctas = getAgentCostOctas(body.agentId);
+        console.log("💰 [API] Price in Octas:", priceInOctas);
 
         // CASE 1: Initial request without payment - Return 402 Payment Required
         if (!paymentSignatureHeader) {
@@ -88,8 +90,7 @@ export async function POST(request: NextRequest) {
 
         const verification = await facilitator.verifyAndSubmit(
             paymentSignature,
-            storedRequest.amount,
-            storedRequest.recipient
+            storedRequest.amount
         );
 
         if (!verification.isValid) {
@@ -100,14 +101,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Payment verified! Execute the REAL agent task
-        console.log(`[x402] Executing agent ${body.agentId} with real AI...`);
+        console.log(`\n✅ [x402] Payment Verified! Executing agent ${body.agentId}...`);
 
         const agentType = getAgentType(body.agentId);
+        console.log(`🎭 [EXECUTOR] Agent Type Resolved:`, agentType);
+        console.log(`🎭 [EXECUTOR] Calling executeAgent with:`, { agentId: body.agentId, agentType, parameters: body.parameters });
+        
         const taskResult = await executeAgent(
             body.agentId,
             agentType,
             body.parameters
         );
+
+        console.log(`🎯 [EXECUTOR] Task Result:`, JSON.stringify(taskResult, null, 2));
 
         // Clean up
         pendingRequests.delete(body.requestId!);

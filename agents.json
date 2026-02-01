@@ -1,0 +1,292 @@
+{
+  "agents": [
+    {
+      "id": "neural-alpha",
+      "name": "Neural Alpha",
+      "description": "Advanced image generation using DALL-E 3. Creates high-quality, detailed images from text descriptions.",
+      "type": "image-generation",
+      "model": "dall-e-3",
+      "capabilities": [
+        "Text-to-image generation",
+        "Artistic style transfer",
+        "Visual design creation",
+        "Concept visualization"
+      ],
+      "costPerRequest": "0.05 APT",
+      "inputSchema": {
+        "prompt": {
+          "type": "string",
+          "description": "Detailed image description or prompt",
+          "required": true,
+          "maxLength": 4000
+        },
+        "size": {
+          "type": "string",
+          "enum": ["1024x1024", "1792x1024", "1024x1792"],
+          "default": "1024x1024"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "URL to generated image" },
+          "revisedPrompt": { "type": "string", "description": "OpenAI's revised/clarified prompt" },
+          "dimensions": { "type": "string" }
+        }
+      },
+      "examples": [
+        "A futuristic city with floating buildings and autonomous drones",
+        "Abstract watercolor painting of a sunset over mountains",
+        "Professional product photography of a sleek tech gadget"
+      ]
+    },
+    {
+      "id": "quantum-sage",
+      "name": "Quantum Sage",
+      "description": "Enterprise-grade code audit and security analysis. Identifies vulnerabilities, performance issues, and best practices.",
+      "type": "code-audit",
+      "model": "gpt-4o",
+      "capabilities": [
+        "Security vulnerability detection",
+        "Performance analysis",
+        "Code quality assessment",
+        "Best practices review",
+        "Multi-language support"
+      ],
+      "costPerRequest": "0.03 APT",
+      "inputSchema": {
+        "code": {
+          "type": "string",
+          "description": "Source code to audit",
+          "required": true,
+          "maxLength": 50000
+        },
+        "language": {
+          "type": "string",
+          "enum": ["javascript", "typescript", "python", "java", "cpp", "rust", "go", "solidity"],
+          "default": "javascript"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "overallScore": { "type": "number", "minimum": 0, "maximum": 10 },
+          "riskLevel": { "enum": ["critical", "high", "medium", "low"] },
+          "vulnerabilities": { "type": "array" },
+          "suggestions": { "type": "array" },
+          "strengths": { "type": "array" }
+        }
+      },
+      "examples": [
+        "Audit a smart contract for security issues",
+        "Review API endpoint authentication logic",
+        "Analyze database query performance"
+      ]
+    },
+    {
+      "id": "oracle-prime",
+      "name": "Oracle Prime",
+      "description": "Real-time financial and cryptocurrency market data analysis. Provides current prices, trends, and market insights.",
+      "type": "financial-analysis",
+      "model": "coingecko-api",
+      "capabilities": [
+        "Price tracking",
+        "Market analysis",
+        "Cryptocurrency data",
+        "Volume and volatility metrics",
+        "Historical data"
+      ],
+      "costPerRequest": "0.02 APT",
+      "inputSchema": {
+        "symbol": {
+          "type": "string",
+          "description": "Asset symbol or name (e.g., bitcoin, ethereum)",
+          "required": true
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "price": { "type": "number" },
+          "marketCap": { "type": "string" },
+          "volume24h": { "type": "string" },
+          "change24h": { "type": "string" }
+        }
+      },
+      "examples": [
+        "Get Bitcoin current price and market cap",
+        "Analyze Ethereum 24h volume trends",
+        "Compare altcoin performance"
+      ]
+    },
+    {
+      "id": "syntax-wizard",
+      "name": "Syntax Wizard",
+      "description": "Intelligent code generation for any programming language. Generates clean, production-ready code from natural language descriptions.",
+      "type": "code-generation",
+      "model": "gpt-4o",
+      "capabilities": [
+        "Code generation",
+        "Algorithm implementation",
+        "Boilerplate creation",
+        "Function generation",
+        "Multi-language support"
+      ],
+      "costPerRequest": "0.03 APT",
+      "inputSchema": {
+        "prompt": {
+          "type": "string",
+          "description": "Description of code to generate",
+          "required": true
+        },
+        "language": {
+          "type": "string",
+          "enum": ["javascript", "typescript", "python", "java", "cpp", "rust", "go", "sql"],
+          "default": "typescript"
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "language": { "type": "string" },
+          "explanation": { "type": "string" }
+        }
+      },
+      "examples": [
+        "Generate a React component for user authentication",
+        "Create a sorting algorithm in Python",
+        "Write database migration scripts"
+      ]
+    },
+    {
+      "id": "atlas-ai",
+      "name": "Atlas AI",
+      "description": "Versatile AI assistant for general text generation, analysis, and reasoning. Handles writing, research, and complex problem-solving.",
+      "type": "text-generation",
+      "model": "gpt-4o",
+      "capabilities": [
+        "Content writing",
+        "Text analysis",
+        "Research and explanation",
+        "Translation",
+        "Summarization"
+      ],
+      "costPerRequest": "0.02 APT",
+      "inputSchema": {
+        "prompt": {
+          "type": "string",
+          "description": "Request or question",
+          "required": true
+        },
+        "system": {
+          "type": "string",
+          "description": "System prompt to guide response"
+        },
+        "maxTokens": {
+          "type": "number",
+          "default": 1500,
+          "maximum": 4000
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "response": { "type": "string" },
+          "prompt": { "type": "string" },
+          "tokenCount": { "type": "number" }
+        }
+      },
+      "examples": [
+        "Write an article about blockchain technology",
+        "Explain quantum computing in simple terms",
+        "Generate a business plan outline"
+      ]
+    },
+    {
+      "id": "search-sage",
+      "name": "Search Sage",
+      "description": "Web search and information retrieval. Finds current information and research across the internet.",
+      "type": "web-search",
+      "model": "serpapi",
+      "capabilities": [
+        "Web search",
+        "Information retrieval",
+        "Research gathering",
+        "Current events",
+        "Topic research"
+      ],
+      "costPerRequest": "0.01 APT",
+      "inputSchema": {
+        "query": {
+          "type": "string",
+          "description": "Search query",
+          "required": true
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "title": { "type": "string" },
+                "description": { "type": "string" },
+                "link": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "examples": [
+        "Search for latest AI developments",
+        "Find information about blockchain projects",
+        "Research market trends"
+      ]
+    },
+    {
+      "id": "sentiment-bot",
+      "name": "Sentiment Bot",
+      "description": "Sentiment and emotion analysis of text. Detects sentiment, emotions, and tone with detailed reasoning.",
+      "type": "sentiment-analysis",
+      "model": "gpt-4o",
+      "capabilities": [
+        "Sentiment classification",
+        "Emotion detection",
+        "Tone analysis",
+        "Sarcasm detection",
+        "Intent analysis"
+      ],
+      "costPerRequest": "0.01 APT",
+      "inputSchema": {
+        "text": {
+          "type": "string",
+          "description": "Text to analyze",
+          "required": true,
+          "maxLength": 10000
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sentiment": { "enum": ["positive", "negative", "neutral"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "score": { "type": "number", "minimum": -1, "maximum": 1 },
+          "emotions": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "examples": [
+        "Analyze customer feedback sentiment",
+        "Detect emotions in social media posts",
+        "Classify review polarity"
+      ]
+    }
+  ],
+  "protocols": {
+    "payment": "x402",
+    "currency": "APT",
+    "authentication": "aptos-keyless",
+    "settlement": "on-chain verified"
+  }
+}

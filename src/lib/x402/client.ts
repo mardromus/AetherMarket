@@ -8,16 +8,22 @@
  * 4. Verify settlement and receive resource
  */
 
-import { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import type {
     PaymentRequired,
     PaymentSignature,
     PaymentResponse,
     PaymentVerification,
-    PaymentStatus,
     AgentTaskRequest,
     AgentTaskResponse
 } from "@/types/x402";
+
+enum PaymentStatus {
+    PENDING = "pending",
+    SUBMITTED = "submitted",
+    CONFIRMED = "confirmed",
+    FAILED = "failed"
+}
 
 export class X402Client {
     private aptos: Aptos;
@@ -35,7 +41,7 @@ export class X402Client {
     async executeAgentTask(
         request: AgentTaskRequest,
         walletAddress: string,
-        signTransaction: (payload: any) => Promise<any>
+        signTransaction: (payload: Record<string, unknown>) => Promise<string>
     ): Promise<AgentTaskResponse> {
 
         // Step 1: Initial request to agent endpoint
@@ -59,7 +65,12 @@ export class X402Client {
                 paymentRequired,
                 walletAddress,
                 signTransaction
-            );
+            ).catch(error => {
+                if (error.message?.includes('INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE')) {
+                    throw new Error('Insufficient balance for gas fee. Please fund your account with at least 0.1 APT.');
+                }
+                throw error;
+            });
 
             // Step 4: Retry request with payment signature
             const paidResponse = await fetch(`/api/agent/execute`, {
@@ -100,13 +111,10 @@ export class X402Client {
         throw new Error(`Unexpected response: ${initialResponse.status}`);
     }
 
-    /**
-     * Create a payment signature for the x402 flow
-     */
     private async createPaymentSignature(
         paymentRequired: PaymentRequired,
         fromAddress: string,
-        signTransaction: (payload: any) => Promise<any>
+        signTransaction: (payload: Record<string, unknown>) => Promise<string>
     ): Promise<PaymentSignature> {
 
         // Pass the payload to the wallet for signing
@@ -118,13 +126,12 @@ export class X402Client {
             ]
         };
 
-        // Sign and submit via wallet adapter
-        const response = await signTransaction(payload);
+        const txnHash = await signTransaction(payload);
 
         return {
-            signature: response.signature || "",
-            publicKey: response.public_key || fromAddress,
-            txnHash: response.hash,
+            signature: txnHash,
+            publicKey: fromAddress,
+            txnHash,
             timestamp: Date.now()
         };
     }
@@ -149,12 +156,13 @@ export class X402Client {
                 };
             }
 
+            const gasFee = (txn as unknown as Record<string, unknown>).gas_used || "0";
             const transaction: PaymentResponse = {
                 transactionHash: txn.hash,
                 blockHeight: Number(txn.version),
-                gasFee: (txn as any).gas_used || "0",
-                amount: "0", // Extract from events
-                settledAt: Math.floor(Date.now() / 1000), // Use current time as fallback
+                gasFee: String(gasFee),
+                amount: "0",
+                settledAt: Math.floor(Date.now() / 1000),
                 success: true
             };
 

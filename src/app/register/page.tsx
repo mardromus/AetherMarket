@@ -30,8 +30,8 @@ export default function RegisterAgent() {
     const addAgent = useAgentStore((state) => state.addAgent);
     const [isMinting, setIsMinting] = useState(false);
 
-    const form = useForm<z.infer<typeof agentSchema>>({
-        resolver: zodResolver(agentSchema),
+    const form = useForm({
+        resolver: zodResolver(agentSchema) as any,
         defaultValues: {
             name: "",
             description: "",

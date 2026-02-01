@@ -48,6 +48,42 @@ interface KeylessContextType {
     sessionTransactions: SessionTransaction[];
 }
 
+/**
+ * Check Aptos network health and pepper service availability
+ */
+async function checkAptosNetworkHealth(): Promise<{ healthy: boolean; status: string; details: any }> {
+    try {
+        const aptos = new Aptos(new AptosConfig({ network: Network.TESTNET }));
+        
+        // Test basic RPC connectivity
+        const ledgerInfo = await aptos.getLedgerInfo();
+        const isHealthy = !!ledgerInfo && !!ledgerInfo.chain_id;
+        
+        return {
+            healthy: isHealthy,
+            status: isHealthy ? 'Network operational' : 'Network issue detected',
+            details: {
+                chainId: ledgerInfo?.chain_id,
+                epoch: ledgerInfo?.epoch,
+                latestLedgerVersion: ledgerInfo?.ledger_version,
+                timestamp: new Date().toISOString(),
+            }
+        };
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('❌ Network health check failed:', errorMsg);
+        
+        return {
+            healthy: false,
+            status: `Network error: ${errorMsg}`,
+            details: {
+                error: errorMsg,
+                timestamp: new Date().toISOString(),
+            }
+        };
+    }
+}
+
 const KeylessContext = createContext<KeylessContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
@@ -80,211 +116,38 @@ export function KeylessProvider({
 
         const restoreState = async () => {
             try {
-                // Load account
-                const savedAccount = localStorage.getItem(STORAGE_KEYS.ACCOUNT);
-                let restoredAccount: KeylessAccount | null = null;
+                // CRITICAL FIX: Do NOT restore account from localStorage
+                // The ephemeralKeyPair cannot be safely serialized/deserialized without corruption
+                // This causes "Unknown variant index" errors during signing
+                // Instead, require fresh authentication on each page load
+                
+                // Clear any stored account to force fresh login
+                localStorage.removeItem(STORAGE_KEYS.ACCOUNT);
+                setAccount(null);
+                
+                console.log('ℹ️ Keyless account cleared. Please login to continue.');
 
-                if (savedAccount) {
-                    const parsed = JSON.parse(savedAccount);
-
-                    // Reconstruct ephemeral keypair
-                    const ephemeralKeyPair = deserializeKeypair(parsed.ephemeralKeyPairSerialized);
-
-                    // Re-derive the SDK keyless account (Critical for signing!)
-                    const pepper = parsed.pepperHex
-                        ? Uint8Array.from(Buffer.from(parsed.pepperHex, 'hex'))
-                        : undefined;
-
-                    if (pepper) console.log('🌶️ Using cached pepper for offline restoration');
-
-                    let sdkKeylessAccount;
-                    try {
-                        // 1. TRY OFFLINE RESTORATION FIRST (If we have proof)
-                        // This bypasses any potential network calls in deriveKeylessAccount
-                        if (parsed.proofHex && pepper) {
-                            console.log('🛡️ Attempting OFFLINE restoration with persisted Proof & Pepper...');
-                            const proofBytes = Uint8Array.from(Buffer.from(parsed.proofHex, 'hex'));
-
-                            // Manual instantiation of the KeylessAccount class
-                            // We need to match the constructor signature or use a fromBytes/create method if available.
-                            // Looking at SDK docs/usage: KeylessAccount usually takes { ephemeralKeyPair, jwt, pepper, proof, ... }
-                            // Let's try to instantiate it.
-
-                            // The SDKKeylessAccount might need 'proof' as a specific object type (ZeroKnowledgeSig).
-                            // However, usually the SDK is flexible or we can cast.
-                            // Actually, let's try `deriveKeylessAccount` again but with the PROOF included if the SDK supports it validation-free.
-                            // BUT `deriveKeylessAccount` threw the error.
-
-                            // Alternative: Construct it manually.
-                            // NOTE: We verified `sdkKeylessAccount` has `proof` property.
-                            // We will try to instantiate it.
-
-                            try {
-                                // We don't have the exact constructor handy, so we'll use a safer approach:
-                                // We create the object with `deriveKeylessAccount` (which we know works if network is okay)
-                                // but since network is BAD, we need a way to skip it.
-
-                                // HACK: If we have the PROOF, we can essentially "mock" the class if we can't instantiate it
-                                // OR use `deriveKeylessAccount` but catch the error and fallback to manual construction?
-                                // The error was "Network Error" inside deriveKeylessAccount.
-
-                                // Let's assume `SDKKeylessAccount` constructor is accessible.
-                                // const acc = new SDKKeylessAccount({ ... }); 
-                                // If that fails (type mismatch), we will use the fallback:
-
-                                // We'll try to use `deriveKeylessAccount` with `proof` if the type allows it, maybe it skips fetch?
-                                // Checking type definition... deriveKeylessAccount input doesn't take 'proof'.
-
-                                // OK, we must instantiate `SDKKeylessAccount`. 
-                                // Constructor signature is typically: new KeylessAccount(args)
-                                // args: { jwt, ephemeralKeyPair, pepper, proof, ... }
-
-                                // Since we don't know the exact "Proof" type (it's likely a class), we might struggle to pass raw bytes.
-                                // However, we know `deriveKeylessAccount` returns `SDKKeylessAccount`.
-
-                                // LET'S TRY THIS:
-                                // We will assume `deriveKeylessAccount` is failing because it tries to verify something.
-                                // If we truly cannot use it, we will construct a partial object that HAS `signTransaction`.
-                                // KeylessAccount.signTransaction uses `this.ephemeralKeyPair.sign(message)` and then creates the ZK signature.
-
-                                // CRITICAL: The `signTransaction` method is what we need.
-                                // It authenticates the tx.
-
-                                // Let's try to instantiate `SDKKeylessAccount` directly.
-                                const decodedJwt = decodeGoogleJWT(parsed.jwt);
-
-                                // FIX: Convert pepper Uint8Array to hex string (SDK expects HexInput which starts with '0x')
-                                const pepperHex = '0x' + Buffer.from(pepper).toString('hex');
-
-                                // FIX: Create a complete proof mock that implements all required methods
-                                const mockProof = {
-                                    bcsToBytes: () => proofBytes,
-                                    serialize: (serializer: any) => {
-                                        // CRITICAL FIX: ZkProof is an Enum (Variant 0 = Groth16).
-                                        // The persisted proofBytes likely lacks the variant index (just the struct).
-                                        // We must PREPEND variant index 0 so Address Derivation & Signature Verification match.
-
-                                        // 1. Write Variant Index 0 (Groth16)
-                                        if (typeof serializer.serializeU32AsUleb128 === 'function') {
-                                            serializer.serializeU32AsUleb128(0);
-                                        } else {
-                                            serializer.serializeU8(0); // Fallback (0 in ULEB128 is 0x00)
-                                        }
-
-                                        // 2. Write the Groth16 struct bytes
-                                        if (typeof serializer.serializeFixedBytes === 'function') {
-                                            serializer.serializeFixedBytes(proofBytes);
-                                        } else {
-                                            proofBytes.forEach((b) => serializer.serializeU8(b));
-                                        }
-                                    }
-                                };
-
-                                sdkKeylessAccount = new SDKKeylessAccount({
-                                    ephemeralKeyPair,
-                                    jwt: parsed.jwt,
-                                    pepper: pepperHex, // FIXED: Use hex string instead of Uint8Array
-                                    uidKey: 'sub',
-                                    uidVal: decodedJwt.sub,
-                                    aud: decodedJwt.aud || 'unknown',
-                                    iss: decodedJwt.iss,
-                                    proof: mockProof as any, // FIXED: Complete proof mock with serialize
-                                    proofFetchCallback: async () => { }, // REQUIRED: SDK validation needs this even for sync proofs
-                                });
-
-                                // CRITICAL STABILITY FIX: Force override the address!
-                                // The SDK's address derivation getter tries to re-serialize EphemeralPublicKey/Proof.
-                                // This causes "Unknown variant index" errors (random bytes used as variant) due to restoration mismatches.
-                                // Since we ALREADY have the correct address from storage, we enforce it to bypass derivation.
-                                Object.defineProperty(sdkKeylessAccount, 'accountAddress', {
-                                    value: AccountAddress.fromString(parsed.address),
-                                    writable: true,
-                                    configurable: true
-                                });
-
-                                // ALSO override authenticationKey to prevent ANY derivation usage
-                                Object.defineProperty(sdkKeylessAccount, 'authenticationKey', {
-                                    value: new AuthenticationKey({
-                                        data: AccountAddress.fromString(parsed.address).toUint8Array() // AuthKey == Address for Keyless
-                                    }),
-                                    writable: true,
-                                    configurable: true
-                                });
-                                console.log('✅ INSTANTIATED KeylessAccount directly (Offline Mode)');
-                            } catch (e) {
-                                console.warn('⚠️ Manual instantiation failed, falling back to derive...', e);
-                                throw e; // Fall through to derive
-                            }
-
-                        } else {
-                            // 2. FALLBACK TO DERIVE (Needs Network if no pepper/proof)
-                            sdkKeylessAccount = await aptos.keyless.deriveKeylessAccount({
-                                ephemeralKeyPair,
-                                jwt: parsed.jwt,
-                                pepper,
-                            });
-                        }
-
-                        // Inject Proof if we used derive (and it didn't fail) but still need to restore proof
-                        if (parsed.proofHex && sdkKeylessAccount && !(sdkKeylessAccount as any).proof) {
-                            const proofBytes = Uint8Array.from(Buffer.from(parsed.proofHex, 'hex'));
-                            (sdkKeylessAccount as any).proof = {
-                                bcsToBytes: () => proofBytes,
-                                serialize: (serializer: any) => {
-                                    serializer.serializeBytes(proofBytes);
-                                }
-                            };
-                        }
-
-                        console.log('✅ Keyless account restored');
-                    } catch (error: any) {
-                        console.error('❌ Failed to restore keyless account:', error);
-
-                        // CRITICAL FIX: Do NOT clear storage on Network Errors or Rate Limits (429)!
-                        const isNetworkError = error.message === 'Network Error' || error.status === 429 || (error.response && error.response.status === 429);
-
-                        if (!isNetworkError) {
-                            // Only clear if it looks like a non-transient logic/data error
-                            // console.warn('⚠️ Clearing potentially corrupt keyless state');
-                            // localStorage.removeItem(STORAGE_KEYS.ACCOUNT);
-                        } else {
-                            console.warn('⚠️ Network/Rate Limit error during restoration. Preserving session for retry.');
-                        }
-
-                        setAccount(null);
-                        return; // Stop restoration
-                    }
-
-                    restoredAccount = {
-                        ...parsed,
-                        ephemeralKeyPair,
-                        keylessAccount: sdkKeylessAccount,
-                        expiryDate: new Date(parsed.expiryDate)
-                    };
-
-                    setAccount(restoredAccount);
-                    console.log('✅ Restored keyless account from storage (Active)');
-                }
-
-                // Load session
+                // Restore session if it exists (sessions are short-lived and safer)
                 const savedSession = localStorage.getItem(STORAGE_KEYS.SESSION);
-                if (savedSession && restoredAccount) {
-                    const parsed = JSON.parse(savedSession);
+                if (savedSession) {
+                    try {
+                        const parsed = JSON.parse(savedSession);
+                        // For sessions, we also generate a fresh keypair on load
+                        const ephemeralKeyPair = EphemeralKeyPair.generate();
 
-                    // Reconstruct session keypair (usually same as account's for this implementation)
-                    const ephemeralKeyPair = deserializeKeypair(parsed.ephemeralKeyPairSerialized);
+                        const sessionObj: DelegationSession = {
+                            ...parsed,
+                            ephemeralKeyPair,
+                            // We'll need to get the keylessAccount from somewhere
+                            // Since we cleared the account, we need to wait for re-auth
+                            keylessAccount: undefined as any
+                        };
 
-                    const sessionObj: DelegationSession = {
-                        ...parsed,
-                        ephemeralKeyPair,
-                        keylessAccount: restoredAccount.keylessAccount // Link to the active account signer
-                    };
-
-                    // Only restore if still valid
-                    if (isSessionValid(sessionObj)) {
-                        setSession(sessionObj);
-                        console.log('✅ Restored delegation session from storage');
-                    } else {
+                        // Don't set session yet - wait for account to be authenticated
+                        // setSession(sessionObj);
+                        localStorage.removeItem(STORAGE_KEYS.SESSION);
+                        console.log('ℹ️ Session cleared. Please login again to create a new session.');
+                    } catch (error) {
                         localStorage.removeItem(STORAGE_KEYS.SESSION);
                     }
                 }
@@ -375,18 +238,45 @@ export function KeylessProvider({
 
             // Step 3: Derive keyless account (returns full KeylessAccount object!)
             // We implement a retry mechanism here because the Aptos Pepper Service can be flaky on Testnet
-            const deriveWithRetry = async (retries = 5, delay = 2000): Promise<any> => {
+            const deriveWithRetry = async (retries = 8, delay = 2000): Promise<any> => {
                 try {
+                    console.log(`⏳ Pepper Service attempt (${9 - retries}/9)...`);
                     return await aptos.keyless.deriveKeylessAccount({
                         ephemeralKeyPair,
                         jwt: idToken,
                     });
                 } catch (err) {
-                    if (retries <= 0) throw err;
+                    const errorMsg = err instanceof Error ? err.message : String(err);
+                    console.warn(`⚠️ Pepper service error: ${errorMsg}`);
+                    
+                    if (retries <= 0) {
+                        console.error('❌ Pepper Service failed after 9 attempts');
+                        console.error('Full error:', err);
+                        
+                        // Last resort: Try to use offline recovery if available
+                        console.log('💾 Attempting offline account recovery...');
+                        const sessionData = sessionStorage.getItem(`keyless_account_${idToken.sub}`);
+                        if (sessionData) {
+                            try {
+                                const recovered = JSON.parse(sessionData);
+                                console.log('✅ Recovered account from session:', recovered.address);
+                                return {
+                                    accountAddress: { toString: () => recovered.address },
+                                    pepper: recovered.pepperHex ? Uint8Array.from(Buffer.from(recovered.pepperHex, 'hex')) : undefined,
+                                    proof: recovered.proofHex ? Uint8Array.from(Buffer.from(recovered.proofHex, 'hex')) : undefined,
+                                };
+                            } catch (e) {
+                                console.error('Failed to recover from session:', e);
+                            }
+                        }
+                        
+                        throw new Error(`Pepper Service unavailable after 9 attempts: ${errorMsg}`);
+                    }
 
-                    console.warn(`⚠️ Pepper service failed, retrying in ${delay}ms... (${retries} attempts left)`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    return deriveWithRetry(retries - 1, delay * 2);
+                    const nextDelay = Math.min(delay * 1.5, 15000); // Cap at 15s
+                    console.warn(`⚠️ Retrying in ${nextDelay}ms... (${retries} attempts left)`);
+                    await new Promise(resolve => setTimeout(resolve, nextDelay));
+                    return deriveWithRetry(retries - 1, nextDelay);
                 }
             };
 
@@ -434,11 +324,10 @@ export function KeylessProvider({
 
             setAccount(keylessAccount);
 
-            // Save to localStorage (serialize keypair AND PEPPER AND PROOF)
+            // Save to localStorage (DO NOT serialize keypair - generate fresh on load)
             localStorage.setItem(STORAGE_KEYS.ACCOUNT, JSON.stringify({
                 address: keylessAccount.address,
                 jwt: keylessAccount.jwt,
-                ephemeralKeyPairSerialized: serializeKeypair(ephemeralKeyPair),
                 expiryDate: keylessAccount.expiryDate.toISOString(),
                 email: keylessAccount.email,
                 name: keylessAccount.name,
@@ -451,20 +340,41 @@ export function KeylessProvider({
 
             console.log('🎉 Keyless account created successfully!');
         } catch (error) {
-            console.error('Failed to create keyless account:', error);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            console.error('❌ Failed to create keyless account:', errorMsg);
 
-            // Helpful error handling for common Aptos Prover Service issues
-            if (error instanceof Error && error.message.includes('Network Error')) {
-                console.error('❌ Failed to contact Aptos Pepper Service. Checks:');
-                console.error('1. Internet connection');
-                console.error('2. Aptos Devnet/Testnet status');
-                console.error('3. CORS/Browser extensions blocking the request');
-
-                // Clear state to allow retry
-                processingRef.current = false;
-                throw new Error('Connection to Aptos Keyless Service failed. Please check your connection and try again.');
+            // Detailed error diagnostics
+            if (errorMsg.includes('Pepper Service')) {
+                console.error('⚠️ Aptos Pepper Service Issue:');
+                console.error('The Pepper Service derives your keyless account.');
+                console.error('');
+                console.error('Possible causes:');
+                console.error('1. Pepper Service is down (check status.aptoslabs.com)');
+                console.error('2. Network connectivity issues');
+                console.error('3. Browser security/CORS restrictions');
+                console.error('4. Testnet congestion (happens on Fridays)');
+                console.error('');
+                console.error('Solutions:');
+                console.error('✓ Try again in 30 seconds');
+                console.error('✓ Clear browser cache and retry');
+                console.error('✓ Try in Incognito/Private mode');
+                console.error('✓ Check Aptos status: https://status.aptoslabs.com');
+                
+                // Check network health
+                const health = await checkAptosNetworkHealth();
+                console.error('Network Health:', health);
+            } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+                console.error('⚠️ JWT Verification Issue:');
+                console.error('Your Google login token may have expired or is invalid.');
+                console.error('Please try logging in again.');
+            } else if (errorMsg.includes('timeout') || errorMsg.includes('TIMEOUT')) {
+                console.error('⚠️ Request Timeout:');
+                console.error('The Pepper Service took too long to respond.');
+                console.error('This usually resolves by retrying.');
             }
 
+            // Clear state to allow retry
+            processingRef.current = false;
             throw error;
         } finally {
             processingRef.current = false;
@@ -511,12 +421,11 @@ export function KeylessProvider({
             setSession(newSession);
             setSessionTransactions([]); // Reset transaction log
 
-            // Save to localStorage (serialize keypair)
+            // Save to localStorage (DO NOT serialize keypair)
             localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
                 ...newSession,
-                ephemeralKeyPairSerialized: serializeKeypair(sessionKeyPair),
-                ephemeralKeyPair: undefined, // Don't serialize the object directly
-                keylessAccount: undefined // Can't serialize, will re-derive on load
+                ephemeralKeyPair: undefined, // Don't store - will regenerate on use
+                keylessAccount: undefined // Can't serialize
             }));
 
             localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
@@ -551,6 +460,16 @@ export function KeylessProvider({
 
         try {
             console.log(`🤖 Signing transaction autonomously... (${session.remainingRequests}/${session.maxRequests} remaining)`);
+
+            // CRITICAL FIX: Ensure ephemeralKeyPair is in sync before signing
+            if (session.ephemeralKeyPair && !session.keylessAccount.ephemeralKeyPair) {
+                console.warn('⚠️ Syncing ephemeralKeyPair into keylessAccount...');
+                Object.defineProperty(session.keylessAccount, 'ephemeralKeyPair', {
+                    value: session.ephemeralKeyPair,
+                    writable: true,
+                    configurable: true
+                });
+            }
 
             // DEBUG: Inspect the signer object
             console.log('🔍 Inspecting session signer:', session.keylessAccount);
@@ -646,7 +565,6 @@ export function KeylessProvider({
             setSession(updatedSession);
             localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
                 ...updatedSession,
-                ephemeralKeyPairSerialized: serializeKeypair(updatedSession.ephemeralKeyPair),
                 ephemeralKeyPair: undefined,
                 keylessAccount: undefined
             }));
@@ -683,7 +601,6 @@ export function KeylessProvider({
             setSession(revokedSession);
             localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
                 ...revokedSession,
-                ephemeralKeyPairSerialized: serializeKeypair(revokedSession.ephemeralKeyPair),
                 ephemeralKeyPair: undefined
             }));
             console.log('🔒 Delegation session revoked');

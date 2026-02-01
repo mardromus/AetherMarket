@@ -78,7 +78,8 @@ export function PaymentModal({
                         setTxnHash(response.hash);
                     }
 
-                    return response;
+                    // Return the transaction hash (string), not the whole object
+                    return response.hash;
                 }
             );
 
@@ -91,11 +92,16 @@ export function PaymentModal({
 
         } catch (err) {
             setStatus(PaymentStatus.FAILED);
-            // Handle specific errors like session expiration
-            if (err instanceof Error && err.message.includes("session")) {
+            const errorMsg = err instanceof Error ? err.message : "Payment failed";
+            
+            if (errorMsg.includes("session")) {
                 setError("Session expired. Please refresh autonomous mode.");
+            } else if (errorMsg.includes("Insufficient balance")) {
+                setError("⚠️ " + errorMsg);
+            } else if (errorMsg.includes("INSUFFICIENT_BALANCE")) {
+                setError("⚠️ Insufficient balance for gas fees. Please fund your account.");
             } else {
-                setError(err instanceof Error ? err.message : "Payment failed");
+                setError(errorMsg);
             }
         }
     };
