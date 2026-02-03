@@ -1,133 +1,141 @@
-# 🧠 Aether Market: The "Under the Hood" Technical Deep Dive
+# 🚀 Aether Market: Hackathon Presentation Guide
 
-Use this content for the **"Technical Architecture"** and **"Innovation"** sections of your presentation. This explains *exactly* how we merged Web2 Identity with Web3 Payments.
-
----
-
-## 1. The Core Innovation: AIP-61 (Keyless Accounts)
-
-Most blockchain apps require a browser extension (Petra, Martian). We removed that barrier using **AIP-61**.
-
-### **What is AIP-61?**
-It is a standard on Aptos that allows a blockchain address to be derived from an OpenID Connect (OIDC) identity (like Google, Apple, or GitHub) combined with a Zero-Knowledge (ZK) Proof.
-
-### **The Cryptographic Flow (The "Magic Trick")**
-
-1.  **Ephemeral Key Generation (Client-Side)**
-    *   The browser generates a temporary public/private key pair (`EphemeralKeyPair`).
-    *   This key lives *only* in browser memory and expires in 1 hour.
-    *   *Why?* So Google never sees your blockchain private key.
-
-2.  **OIDC Handshake (OAuth 2.0)**
-    *   We send the user to Google.
-    *   **Crucial Step**: We embed the `Ephemeral_Public_Key` into the **nonce** field of the request.
-    *   Google responds with a **JWT (JSON Web Token)** signed by Google's private key.
-    *   *The link*: The JWT says "Kushal owns this email AND he authorized this Ephemeral Key (via nonce)."
-
-3.  **Zero-Knowledge Proof (Groth16)**
-    *   We generate a **ZK Proof** (using Groth16) that proves:
-        *   "I have a valid JWT signed by Google."
-        *   "The JWT contains the user's customized identity (sub)."
-        *   "The JWT contains the specific Ephemeral Public Key."
-    *   **Privacy**: The proof reveals `Hash(uid, pepper, aud)`, NOT the user's email or the raw signature.
-
-4.  **On-Chain Verification**
-    *   The transaction is signed by the *Ephemeral Private Key*.
-    *   The transaction includes the *ZK Proof* and the *Ephemeral Public Key*.
-    *   The Aptos blockchain verifies the proof against the verification key (stored on-chain).
-    *   **Result**: Valid transaction from `0xADDRESS`.
+This document contains everything you need to build your slide deck. It includes **Bullet Points**, **Speaker Notes**, **Code Snippets**, and **Screenshot Suggestions**.
 
 ---
 
-## 2. Address Derivation & Privacy (The "Pepper")
+## 🎨 Slide 1: Title Slide
+**Title:** Aether Market: The First Autonomous Agent Economy on Aptos
+**Subtitle:** Powered by AIP-61 Keyless Identity & x402 Micropayments
+**Team Name:** [Your Team Name]
 
-How do we ensure privacy? If we just hashed `kushal@gmail.com`, anyone could guess the hash.
+---
 
-### **The Formula**
+## 🛑 Slide 2: The Problem
+**Headline:** AI Agents are Siloed and Unbanked.
+
+*   **Identities are Fragmented:** Agents use API keys, not identities. They can't "own" anything.
+*   **Payments are Broken:** Subscriptions (SaaS) don't work for machine-to-machine interaction. An AI agent cannot "subscribe" to another AI agent.
+*   **UX is Friction:** Users don't want to manage private keys or seed phrases just to use an AI app.
+
+---
+
+## 💡 Slide 3: The Solution (Aether Market)
+**Headline:** A Unified Operating System for Autonomous Agents.
+
+*   **Keyless Entry:** Log in with Google, transact on-chain (AIP-61). Zero seed phrases.
+*   **M2M Economy:** Agents pay each other per-request using the **x402 Protocol**.
+*   **Composable:** Any developer can integrate our agents using the Aether SDK.
+
+**[INSERT SCREENSHOT: Aether Market Dashboard showing available agents]**
+
+---
+
+## 🛠️ Slide 4: Technical Deep Dive - AIP-61 (Keyless)
+**Headline:** Web2 UX + Web3 Security (ZK Proofs)
+
+*   **No Wallets Required:** We use **Aptos AIP-61 Keyless Accounts**.
+*   **How it works:**
+    1.  User signs into Google (OIDC).
+    2.  We generate a **Zero-Knowledge Proof (Groth16)** linking the JWT to a blockchain address.
+    3.  An **Ephemeral Key** (stored in browser memory) signs transactions.
+*   **Security:** Google *never* sees the private key. The proof is verified verify on-chain.
+
+**[INSERT SCREENSHOT: The "Shield" icon in the navbar showing your address `0x...`]**
+
+---
+
+## 💳 Slide 5: The x402 Payment Protocol
+**Headline:** HTTP 402 - The Missing Status Code
+
+We implemented the `402 Payment Required` standard for handling autonomous payments.
+
+**The Flow:**
+1.  **Request:** Client asks Agent to "Generate Image".
+2.  **Challenge:** Server responds: `402 Payment Required` + `Recipient Address` + `Price`.
+3.  **Payment:** Client broadcasts transaction on Aptos.
+4.  **Proof:** Client retries request with header: `PAYMENT-SIGNATURE: 0xTxnHash...`.
+5.  **Execution:** Server verifies hash on-chain -> Deliver Result.
+
+---
+
+## 💻 Slide 6: LIVE DEMO - The SDK Integration
+**Headline:** "Anyone can build on Aether"
+
+*We proved this works externally. We built a Node.js client (outside the app) that hires an agent.*
+
+**Code Snippet (The Client Loop):**
+```javascript
+// SDK_DEMO_PROJECT/client.js
+
+// 1. Initial Request (Fails with 402)
+const res1 = await fetch(GATEWAY_URL, payload);
+const invoice = await res1.json(); // Price: 0.02 APT
+
+// 2. Sign & Pay on Chain
+const txn = await aptos.signAndSubmitTransaction({
+    sender: account,
+    data: { 
+        function: "0x1::aptos_account::transfer", 
+        arguments: [invoice.recipient, invoice.amount] 
+    }
+});
+
+// 3. Retry with Proof
+const res2 = await fetch(GATEWAY_URL, {
+    headers: { 
+        'PAYMENT-SIGNATURE': JSON.stringify({ txnHash: txn.hash }) 
+    },
+    body: JSON.stringify(payload)
+});
+
+// ✅ Success: Agent performs task!
 ```
-Aptos_Address = Hash(
-    UID (Google User ID) 
-    + App_ID (aud) 
-    + PEPPER (Secret Blinding Factor)
-)
-```
 
-### **The Pepper Service**
-*   We run a private service that stores a database of `UID -> Pepper`.
-*   When a user logs in, we fetch their specific Pepper.
-*   **Property**: The Pepper ensures your wallet address is stable (same email = same wallet) but private (cannot be reverse-engineered to the email).
+**[INSERT SCREENSHOT: Your terminal output showing "✅ Transaction Confirmed on Chain!" and "🤖 Agent Output"]**
 
 ---
 
-## 3. The x402 Protocol: Testnet vs Mainnet Flow
+## 📊 Slide 7: Verification System
+**Headline:** Trust, Verified.
 
-You asked: **"What is the flow currently in Testnet?"**
+*   **On-Chain Verification:** The server (Facilitator) reads the Aptos Blockchain state.
+*   **Instant Settlement:** We use Optimistic Verification on Testnet for sub-second agent response times.
+*   **Double-Spend Protection:** Each Request ID + Transaction Hash pair is unique.
 
-On Testnet, we use **Optimistic Verification** to simulate "Instant Settlement" without waiting for block finality latency.
-
-### **The Testnet Payment Flow (Current Implementation)**
-
-1.  **Trigger**: User clicks "Execute" (e.g., generate image).
-2.  **State Check**: Client checks `KeylessAccount` existence.
-3.  **Transaction Build**:
-    *   Client constructs a transfer transaction: `0.02 APT` -> `FacilitatorAddress` (or Treasury).
-4.  **Signing**:
-    *   Client signs with **Keyless Ephemeral Key** (Instant).
-    *   Client submits to Aptos Testnet node.
-    *   Node returns `PendingTransactionHash`.
-5.  **Optimistic Handshake (The "Fast Path")**:
-    *   Client sends `PAYMENT-SIGNATURE: 0xHash` header to our API immediately.
-    *   **API Verification**:
-        *   Our API calls the Aptos Node: `GET /transactions/by_hash/{hash}`.
-        *   **Testnet Trick**: Even if the transaction is "Pending", if the signature is valid and gas is sufficient, we **accept it immediately**.
-        *   We don't wait for 100% block finality.
-    *   **Result**: The AI Agent starts working *milliseconds* after you click the button.
-
-### **The Mainnet Flow (Future)**
-On Mainnet, we will wait for **1 Block Confirmation (~200ms on Aptos)** to ensure the money actually moved before burning expensive GPU credits.
-
----
-
-## 4. Key Differentiators (Why We Win)
-
-| Feature | Competitors (Traditional) | Aether Market (AIP-61 + x402) |
-| :--- | :--- | :--- |
-| **Onboarding** | "Install Metamask, save seed phrase" | "Sign in with Google" |
-| **Payments** | Subscription with Credit Card | Pay-per-request (Micropayments) |
-| **Latency** | High (Block confirmations) | Sub-second (Optimistic verification) |
-| **Privacy** | Public wallet tracking | ZK-Shielded Identity |
-
----
-
-## 5. Code Snippet for AIP-61 (React)
-
+**Code Snippet (The Server Verification):**
 ```typescript
-// src/lib/keyless/provider.tsx
+// src/app/api/agent/execute/route.ts
 
-const signWithSession = async (payload: any) => {
-    // 1. Get the active Ephemeral Key Pair
-    const keyPair = loadEphemeralKeyPair(); 
-    
-    // 2. Get the ZK Proof (already generated at login)
-    const proof = loadZKProof();
+// Verify on-chain data
+const verification = await facilitator.verifyAndSubmit(
+    paymentSignature,
+    storedRequest.amount
+);
 
-    // 3. Create the Transaction
-    const transaction = await aptos.transaction.build.simple({
-        sender: account.address,
-        data: payload
-    });
+if (!verification.isValid) {
+    return NextResponse.json({ error: "Payment failed" }, { status: 402 });
+}
 
-    // 4. Sign it using the Ephemeral Key (No Popup!)
-    const senderAuthenticator = aptos.transaction.sign.keyless({
-        transaction,
-        signer: keyPair,
-        proof // Attach the ZK Proof
-    });
-
-    // 5. Submit to Chain
-    return await aptos.transaction.submit.simple({
-        transaction,
-        senderAuthenticator
-    });
-};
+// Payment confirmed -> Execute AI Model
+const result = await executeAgent(agentId, parameters);
 ```
+
+**[INSERT SCREENSHOT: Aptos Explorer showing the transaction from your Keyless Account to the Agent]**
+
+---
+
+## 🏆 Slide 8: Why We Win (Impact)
+*   **Target Audience:** Non-crypto natives (Keyless) + AI Developers (SDK).
+*   **Scalability:** Aptos high throughput + Move security.
+*   **Future:** We are building the "App Store" for AI Agents.
+
+---
+
+## 📸 Checklist: Screenshots to Capture
+1.  **Homepage:** The Hero section with "Connect with Google".
+2.  **Dashboard:** The list of agents with prices in APT.
+3.  **Aptos Explorer:** A transaction details page showing `transfer` of `0.02 APT`.
+4.  **Terminal:** The output of `node client.js` showing the successful handshake.
+5.  **Navbar:** The Wallet Selector showing your balance (evidence of balance fetching).
+
