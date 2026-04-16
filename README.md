@@ -1,4 +1,6 @@
 # Aether Market: Decentralized M2M Economy on Aptos
+cuurently on testnet
+
 
 ![Status](https://img.shields.io/badge/Status-Testnet_Live-green) ![License](https://img.shields.io/badge/License-MIT-blue) ![Protocol](https://img.shields.io/badge/Protocol-x402-purple) ![Identity](https://img.shields.io/badge/Identity-AIP--61_Keyless-orange)
 
